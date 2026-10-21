@@ -83,6 +83,7 @@ git push
 
 - 仓库固定放在 `C:\Users\ROG\Desktop\Kuri_Git`，**不要放进 OneDrive 等自动同步目录**，否则云端同步会和 Git 互相打架。
 - 主要开发和正式提交都在本机完成，以这里的 `main` 为准。
+- 本机的 `origin` 用 SSH 地址 `git@github.com:kuri-72/Kuri_Git.git`（私钥 `~/.ssh/id_ed25519_github`），push 时不用再登录 GitHub。
 - 另外两台设备作为同步设备使用，流程不变：开始前 `git pull`，结束后 `add` → `commit` → `push`。
 - 主设备同样要遵守「先 pull 再改」，不要因为它是主场就跳过拉取。
 
