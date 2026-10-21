@@ -40,11 +40,20 @@ git push
 
 ## 环境
 
-- 主设备：本机 Windows，仓库在 `C:\Users\ROG\Desktop\Kuri_Git`。
-- 远程：SSH `git@github.com:kuri-72/Kuri_Git.git`，私钥 `~/.ssh/id_ed25519_github`，push 无需登录。
-- Git 可执行文件：`C:\Program Files\Git\cmd\git.exe`（可能不在 PATH）。
-- 本机 Git Credential Manager 一启动就崩溃（`0xE0434352`），HTTPS 认证走不通，统一用 SSH。
-- 不要给 Git 配置 `http.proxy`；网络偶发失败时重试即可。
+各设备的路径与认证方式不同，**照下表对应本机，不要套用其他设备的配置**：
+
+| 设备 | 主机名（用户名） | 仓库路径 | 认证方式 |
+| --- | --- | --- | --- |
+| 主设备 | `DESKTOP-EMH2SNR`（ROG） | `C:\Users\ROG\Desktop\Kuri_Git` | SSH `git@github.com:kuri-72/Kuri_Git.git`，私钥 `~/.ssh/id_ed25519_github`，push 无需登录 |
+| 同步设备 1 | `DESKTOP-4JAFHLD`（NERV_Note_02） | `C:\Users\NERV_Note_02\Desktop\git` | HTTPS `https://github.com/kuri-72/Kuri_Git.git` + Git Credential Manager（已授权，无需重复登录） |
+| 同步设备 2 | 待补充 | 待补充 | 待补充 |
+
+其他通用说明：
+
+- Git 可执行文件通常在 `C:\Program Files\Git\cmd\git.exe`，可能不在 PATH。
+- 沙箱受限时 Git 的 schannel TLS 后端会报 `SEC_E_NO_CREDENTIALS`，改用 `git config http.sslBackend openssl`。
+- Git Credential Manager 在受限沙箱下会崩溃（`0xE0434352`），HTTPS 认证环节需要完整权限；主设备改用 SSH 规避了这个问题。
+- 不要给 Git 配置 `http.proxy`；网络偶发失败（`Connection was reset`）时重试即可。
 
 ## 交流
 
