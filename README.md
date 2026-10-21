@@ -79,20 +79,14 @@ git push
 
 ### 设备角色（2026-10-22 确定）
 
-| 设备 | 主机名（用户名） | 仓库路径 | 认证方式 |
-| --- | --- | --- | --- |
-| **主设备（主场）** | `DESKTOP-EMH2SNR`（ROG） | `C:\Users\ROG\Desktop\Kuri_Git` | SSH `git@github.com:kuri-72/Kuri_Git.git`，私钥 `~/.ssh/id_ed25519_github` |
-| 同步设备 1 | `DESKTOP-4JAFHLD`（NERV_Note_02） | `C:\Users\NERV_Note_02\Desktop\git` | HTTPS + GitHub 凭据管理器（已授权） |
-| 同步设备 2 | 待补充 | 待补充 | 待补充 |
+各设备的仓库路径与认证方式，**以 [`AGENTS.md`](AGENTS.md) 的「设备」表为准**——那里只维护一份，避免两处写不一致。
 
-说明：
-
-- **主设备（主场）**承担主要开发和正式提交，以它的 `main` 为准。
-- 两台同步设备流程完全相同：开始前 `git pull`，结束后 `add` → `commit` → `push`。
-- **每台设备以自己那一行的路径和认证方式为准**，不要照抄别的设备。主设备用 SSH、同步设备 1 用 HTTPS，混用会连不上。
-- 所有设备都**不要**把仓库放进 OneDrive 等自动同步目录，否则云端同步会和 Git 互相打架。
-- 主设备同样要遵守「先 pull 再改」，不要因为它是主场就跳过拉取。
-- 每台设备的操作记录统一在 [`SYNC-TEST.md`](SYNC-TEST.md)（单文件，只留最近 30 条），同步出问题时先看它。
+- **主设备（主场）**：`DESKTOP-EMH2SNR`（ROG），承担主要开发和正式提交。
+- **同步设备**：流程相同，开始前 `git pull`，结束后 `add` → `commit` → `push`。
+- **每台只按自己那一行配置**，不要照抄别的设备（主设备用 SSH，同步设备 1 用 HTTPS）。
+- 所有设备都**不要**把仓库放进 OneDrive 等自动同步目录。
+- 主设备也要「先 pull 再改」，不要因为它是主场就跳过。
+- 同步状态记在 [`SYNC-TEST.md`](SYNC-TEST.md)（可选，只留最近 30 条）。
 
 ## 交接给 AI 助手（换新设备时用）
 
