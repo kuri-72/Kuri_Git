@@ -18,6 +18,8 @@ import homography
 import pid
 import servo_bus
 import gimbal
+import tracker
+import registry
 
 
 def approx(a, b, tol=1e-6, msg=""):
@@ -276,6 +278,179 @@ def test_gimbal_reset():
     pan, tilt = ctrl.reset()
     if pan != 2048 or tilt != 2048:
         raise AssertionError("reset should return center")
+
+
+# ------------------------------------------------------------------- tracker
+
+def test_tracker_keeps_id():
+    tr = tracker.IoUTracker(iou_threshold=0.3, max_age=10, min_hits=1)
+    tr.update([(100.0, 100.0, 60.0, 60.0)], 0.0)
+    ids = set()
+    for i in range(1, 6):
+        b = (100.0 + i * 2.0, 100.0, 60.0, 60.0)
+        matched = tr.update([b], i * 0.033)
+        for t in matched:
+            ids.add(t.id)
+    if len(ids) != 1:
+        raise AssertionError("id should stay stable, got %r" % (ids,))
+
+
+def test_tracker_survives_occlusion():
+    tr = tracker.IoUTracker(max_age=10, min_hits=2)
+    box = (100.0, 100.0, 60.0, 60.0)
+    tr.update([box], 0.0)
+    tr.update([box], 0.033)
+    tid = tr.tracks[0].id
+
+    for i in range(3):
+        tr.update([], 0.033 * (i + 2))
+
+    if len(tr.tracks) != 1:
+        raise AssertionError("track dropped too early: %d alive" % len(tr.tracks))
+
+    back = tr.update([box], 0.033 * 5)
+    if not back or back[0].id != tid:
+        raise AssertionError("should re-acquire same id after occlusion")
+
+
+def test_tracker_expires():
+    tr = tracker.IoUTracker(max_age=2, min_hits=1)
+    tr.update([(10.0, 10.0, 20.0, 20.0)], 0.0)
+    for i in range(5):
+        tr.update([], 0.033 * (i + 1))
+    if tr.tracks:
+        raise AssertionError("track should expire, %d left" % len(tr.tracks))
+
+
+def test_tracker_confirmation():
+    tr = tracker.IoUTracker(min_hits=3)
+    box = (50.0, 50.0, 40.0, 40.0)
+    tr.update([box], 0.0)
+    if tr.confirmed_tracks():
+        raise AssertionError("new track must not be confirmed")
+    tr.update([box], 0.033)
+    if tr.confirmed_tracks():
+        raise AssertionError("2 hits must not be confirmed")
+    tr.update([box], 0.066)
+    if len(tr.confirmed_tracks()) != 1:
+        raise AssertionError("3 hits should confirm")
+
+
+def test_tracker_two_objects():
+    tr = tracker.IoUTracker(min_hits=1)
+    a = (10.0, 10.0, 40.0, 40.0)
+    b = (300.0, 10.0, 40.0, 40.0)
+    tr.update([a, b], 0.0)
+    matched = tr.update([a, b], 0.033)
+    ids = sorted(t.id for t in matched)
+    if len(ids) != 2 or ids[0] == ids[1]:
+        raise AssertionError("two objects need two ids, got %r" % (ids,))
+
+
+# ------------------------------------------------------------------ registry
+
+def test_registry_merges_same_object():
+    reg = registry.ObjectRegistry(merge_distance_m=0.2)
+    a = reg.observe("cup", 1.0, 2.0, ts=0.0)
+    b = reg.observe("cup", 1.05, 2.02, ts=1.0)
+    if a["id"] != b["id"]:
+        raise AssertionError("should merge into one item")
+    if b["hits"] != 2:
+        raise AssertionError("hits should be 2, got %d" % b["hits"])
+    if len(reg) != 1:
+        raise AssertionError("registry should hold 1 item")
+    approx(b["x"], 1.025, 1e-9, "averaged x")
+
+
+def test_registry_separates_far():
+    reg = registry.ObjectRegistry(merge_distance_m=0.2)
+    a = reg.observe("cup", 1.0, 2.0)
+    b = reg.observe("cup", 1.5, 2.0)
+    if a["id"] == b["id"]:
+        raise AssertionError("far objects must not merge")
+    if len(reg) != 2:
+        raise AssertionError("registry should hold 2 items")
+
+
+def test_registry_kind_isolation():
+    reg = registry.ObjectRegistry(merge_distance_m=1.0)
+    a = reg.observe("cup", 0.0, 0.0)
+    b = reg.observe("bottle", 0.0, 0.0)
+    if a["id"] == b["id"]:
+        raise AssertionError("different kinds must stay separate")
+
+
+def test_registry_nearest():
+    reg = registry.ObjectRegistry(merge_distance_m=0.05)
+    reg.observe("cup", 0.0, 0.0)
+    reg.observe("cup", 2.0, 0.0)
+    it = reg.nearest(1.9, 0.0, kind="cup")
+    if it is None or abs(it["x"] - 2.0) > 1e-9:
+        raise AssertionError("nearest returned %r" % (it,))
+
+
+def test_registry_save_load():
+    import tempfile
+    reg = registry.ObjectRegistry()
+    reg.observe("cup", 0.1, 0.2, ts=1.0)
+    reg.observe("bottle", 0.5, 0.6, ts=2.0)
+
+    path = os.path.join(tempfile.gettempdir(), "kuri_registry_test.json")
+    reg.save(path)
+    reg2 = registry.ObjectRegistry.load(path)
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+    if len(reg2) != 2:
+        raise AssertionError("loaded %d items" % len(reg2))
+    if reg2.items[0]["kind"] != "cup":
+        raise AssertionError("kind lost on load")
+
+
+def test_registry_max_items():
+    reg = registry.ObjectRegistry(merge_distance_m=0.01, max_items=3)
+    for i in range(5):
+        reg.observe("cup", float(i), 0.0, ts=float(i))
+    if len(reg) != 3:
+        raise AssertionError("max_items not enforced: %d" % len(reg))
+    xs = sorted(it["x"] for it in reg.items)
+    if xs[0] < 1.9:
+        raise AssertionError("oldest should be evicted, got %r" % (xs,))
+
+
+# --------------------------------------------------------------- 闭环仿真
+
+def test_closed_loop_tracking_converges():
+    """无硬件的端到端验证：像素 -> 角误差 -> PID -> 舵机 -> 目标回中。"""
+    cam = vision_math.CameraModel(500.0, 500.0, 320.0, 240.0)
+    pan_axis = pid.PID(kp=1.5, out_min=-1.0, out_max=1.0)
+    tilt_axis = pid.PID(kp=1.5, out_min=-1.0, out_max=1.0)
+    ctrl = gimbal.PanTiltController(pan_axis, tilt_axis,
+                                    pan_center=2048, tilt_center=2048,
+                                    max_rate_ticks_per_s=1500.0)
+
+    target_bearing = 0.20      # 目标在世界中的方位角（弧度）
+    ticks_per_rad = 1000.0
+    dt = 0.033
+
+    for _ in range(80):
+        cam_bearing = (ctrl.pan - 2048) / ticks_per_rad
+        err = target_bearing - cam_bearing
+        u = 320.0 + cam.fx * math.tan(err)
+        yaw_err, pitch_err = cam.yaw_pitch_error(u, 240.0)
+        ctrl.update(yaw_err, pitch_err, dt)
+
+    final_err = abs((ctrl.pan - 2048) / ticks_per_rad - target_bearing)
+    if final_err > 0.01:
+        raise AssertionError("did not converge: %.4f rad" % final_err)
+
+    # 收敛后目标应接近画面中心
+    cam_bearing = (ctrl.pan - 2048) / ticks_per_rad
+    px = 320.0 + cam.fx * math.tan(target_bearing - cam_bearing)
+    if abs(px - 320.0) > 5.0:
+        raise AssertionError("target not centered: u=%.1f" % px)
 
 
 # ---------------------------------------------------------------------- main

@@ -11,11 +11,13 @@ k230/
 ├── lib/
 │   ├── vision_math.py   相机内参、像素↔归一化、地面投影（相对/绝对坐标）、bbox 工具
 │   ├── homography.py    平面单应：像素 ↔ 桌面绝对坐标，含最小二乘求解与误差评估
+│   ├── tracker.py       多目标跟踪：IoU 匹配 + 匀速预测，稳定 ID、抗漏检
+│   ├── registry.py      物品登记表：绝对坐标去重合并、查询、JSON 持久化
 │   ├── pid.py           PID（死区、积分限幅、输出限幅、斜率限制）
 │   ├── servo_bus.py     飞特 SCS/STS 兼容串口帧：组包、解析、同步写
 │   └── gimbal.py        云台控制器：角误差 → 舵机位置（增量式）
 └── tests/
-    └── test_all.py      26 项离线测试
+    └── test_all.py      38 项离线测试（含无硬件闭环仿真）
 ```
 
 ## 跑测试
@@ -29,7 +31,7 @@ python k230/tests/test_all.py
 期望输出：
 
 ```text
-26 passed, 0 failed, 26 total
+38 passed, 0 failed, 38 total
 ```
 
 ## 各模块能解决什么问题
@@ -73,6 +75,28 @@ bus.set_positions({1: pan, 2: tilt})
 ### `servo_bus.py`
 
 飞特（Feetech）SCS/STS 帧格式。如果你的舵机是别的协议，只需要替换 `build_packet` 与寄存器地址，上层 `PanTiltController` 不用改。
+
+### 一条完整的感知链路
+
+```python
+from tracker import IoUTracker
+from registry import ObjectRegistry
+
+tracker = IoUTracker(min_hits=3, max_age=15)
+reg = ObjectRegistry(merge_distance_m=0.12)
+
+# 每一帧：
+dets = [...]                        # [(x, y, w, h), ...]，来自 YOLO / 人脸检测
+tracks = tracker.update(dets, t)    # 返回本帧匹配上的轨迹，ID 稳定
+
+for tr in tracks:
+    u, v = tr.center()
+    g = plane.pixel_to_ground(u, v)  # 绝对坐标（米）
+    if g is not None:
+        reg.observe(kind="cup", x=g[0], z=g[1], ts=t)
+```
+
+`tracker` 负责「同一个东西不要换 ID」，`registry` 负责「同一个东西不要记成两条」。
 
 ## 在 K230 上使用
 
