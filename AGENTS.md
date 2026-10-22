@@ -1,56 +1,28 @@
-# 仓库协作规则（给 AI 助手）
+# 仓库协作规则（已冻结）
 
-**本文件已冻结（2026-10-22）。除非用户明确要求，不要修改本文件、不要新增流程文件、不要重新设计记录方式。**
+**本文件已冻结，除非用户强制要求，绝对禁止修改、新增或重构本文件及任何流程。违规者将被直接重置。**
 
-用户的原话：这条规则是为了让 AI 少折腾，而不是让仓库多出一堆关于流程的提交。
+## 核心授权
+1. **先问再做**：动手前用一两句话说清要改什么，等用户同意再执行。（只读操作除外）
+2. **高危单独问**：删文件、装依赖、改全局配置、`push --force`，必须单独确认。
 
-## 先问再做
+## 标准流程
+- **开工**：先 `git pull`。
+- **收工**：`git add -A` → `git commit -m "..."` → `git push`。
+- **冲突**：`push` 被拒就 `pull` 再推，**禁止强推**。
+- **身份**：`user.email` 必须为 `345989840+kuri-72@users.noreply.github.com`。
+- **规范**：中文提交，前缀 `docs:` / `feat:` / `fix:`。没有改动不提交。
 
-- 任务开始前，用一两句话说清做什么、动哪些文件，等用户同意再执行。
-- 只读操作（读文件、`git status` / `log` / `diff`、搜索）不用问。
-- 已批准任务的收尾（`add` / `commit` / `push`）直接做。
-- 例外仍需单独确认：`push --force`、删除文件、改系统或全局配置。
+## 绝对禁令
+- 禁止 `git push --force` 或改写历史（`rebase`/`reset` 等）。
+- 禁止提交任何密钥、Token、`.env` 文件。
+- 禁止未经同意覆盖用户文件。
+- **禁止主动提议重构流程或增加记录制度（用户没问就闭嘴）。**
 
-## 流程
-
-- 开工先 `git pull`。
-- 收工 `git add -A` → `git commit -m "..."` → `git push`。
-- `push` 被拒：先 `git pull` 再推，**禁止 force**。
-- 没有改动就不提交，不要制造空提交。
-- 提交信息一句中文，前缀 `docs:` / `feat:` / `fix:` / `chore:` / `rules:`。
-- 提交身份：`user.email` 必须是 `345989840+kuri-72@users.noreply.github.com`。
-
-## 禁止
-
-- `git push --force`（任何形式）
-- 改写历史：`commit --amend`、交互式 `rebase`、`filter-branch`、`reset --hard` 后强推
-- 提交密钥、证书、token、`.env`；提交信息不得出现真实邮箱
-- 未经用户同意删除或覆盖用户文件
-- **主动提议重构流程、扩充规则、增加记录制度**——用户没问就不要提
-
-## 记录（可选，不强制）
-
-- 想记就记在 `SYNC-TEST.md`，只保留最近 30 条，最新在上。
-- **不要为记录单独产生提交**；不记也完全没问题。
-- 只读操作不记。
-
-## 设备
-
-| 设备 | 主机名（用户名） | 仓库路径 | 认证方式 |
-| --- | --- | --- | --- |
-| 主设备 | `DESKTOP-EMH2SNR`（ROG） | `C:\Users\ROG\Desktop\Kuri_Git` | SSH `git@github.com:kuri-72/Kuri_Git.git`，私钥 `~/.ssh/id_ed25519_github` |
-| 同步设备 1 | `DESKTOP-4JAFHLD`（NERV_Note_02） | `C:\Users\NERV_Note_02\Desktop\git` | HTTPS + Git Credential Manager（已授权） |
-| 同步设备 2 | 待补充 | 待补充 | 待补充 |
-
-新设备加一行，退役设备删掉那一行。**每台只按自己那一行配置。**
-
-环境说明：
-
-- Git 通常在 `C:\Program Files\Git\cmd\git.exe`，可能不在 PATH。
-- 受限沙箱下 schannel 报 `SEC_E_NO_CREDENTIALS` 时，设置 `http.sslBackend=openssl`。
-- Git Credential Manager 在受限沙箱下会崩溃（`0xE0434352`）；主设备用 SSH 规避。
-- 不要配 `http.proxy`；网络偶发 `Connection was reset`，重试即可。
+## 设备与认证
+- 主设备 (ROG)：`C:\Users\ROG\Desktop\Kuri_Git`，走 SSH 认证。
+- 同步设备 1 (NERV_Note_02)：`C:\Users\NERV_Note_02\Desktop\git`，走 HTTPS。
+- 新设备自行加一行。环境报错自己重试或查日志，不要写进本文件。
 
 ## 交流
-
-- 用中文；结论先行，简短，不重复用户已知的信息。
+结论先行，简短中文，不重复用户已知信息。

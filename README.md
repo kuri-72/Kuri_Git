@@ -16,8 +16,12 @@ git clone https://github.com/kuri-72/Kuri_Git.git
 
 ```text
 .
-├── README.md
-└── .gitignore
+├── README.md            本文件
+├── AGENTS.md            AI 助手协作规则
+├── .gitignore
+├── .gitattributes       统一 LF 换行
+├── docs/                可行性文档、讨论存档
+└── k230/                K230 项目代码
 ```
 
 ## 多设备同步（三台设备）
@@ -79,14 +83,14 @@ git push
 
 ### 设备角色（2026-10-22 确定）
 
-各设备的仓库路径与认证方式，**以 [`AGENTS.md`](AGENTS.md) 的「设备」表为准**——那里只维护一份，避免两处写不一致。
+各设备的仓库路径与认证方式，**以 [`AGENTS.md`](AGENTS.md) 的「设备与认证」一节为准**——那里只维护一份，避免两处写不一致。
 
 - **主设备（主场）**：`DESKTOP-EMH2SNR`（ROG），承担主要开发和正式提交。
 - **同步设备**：流程相同，开始前 `git pull`，结束后 `add` → `commit` → `push`。
 - **每台只按自己那一行配置**，不要照抄别的设备（主设备用 SSH，同步设备 1 用 HTTPS）。
 - 所有设备都**不要**把仓库放进 OneDrive 等自动同步目录。
 - 主设备也要「先 pull 再改」，不要因为它是主场就跳过。
-- 同步状态记在 [`SYNC-TEST.md`](SYNC-TEST.md)（可选，只留最近 30 条）。
+- 判断同步是否正常，一条命令就够：`git status -sb` 显示 `## main...origin/main` 且没有 ahead / behind。
 
 ## 交接给 AI 助手（换新设备时用）
 
