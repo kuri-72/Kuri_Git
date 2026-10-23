@@ -21,7 +21,11 @@ git clone https://github.com/kuri-72/Kuri_Git.git
 ├── .gitignore
 ├── .gitattributes       统一 LF 换行
 ├── docs/                可行性文档、讨论存档
-└── k230/                K230 项目代码
+├── k230/                K230 项目代码
+└── xiao72/              小72 灯控链路（文本→意图→协议→STM32 PWM）
+    ├── docs/            协议规格、项目章程、能力边界、教学台
+    ├── firmware/        STM32 C：解析器/板级对接/OLED/PC模拟器
+    └── host/            PC Python：意图识别/状态合并/串口/一致性验证
 ```
 
 ## 多设备同步（三台设备）

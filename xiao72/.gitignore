@@ -1,0 +1,7 @@
+﻿.env
+__pycache__/
+*.pyc
+firmware/*.obj
+firmware/*.exe
+firmware/*.pdb
+firmware/*.ilk
