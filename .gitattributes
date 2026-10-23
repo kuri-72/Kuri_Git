@@ -1,2 +1,10 @@
-# 统一按 LF 存储，避免 Windows 各设备 autocrlf 设置不一致导致整文件 diff
+﻿# 统一按 LF 存储，避免 Windows 各设备 autocrlf 设置不一致导致整文件 diff
 * text=auto eol=lf
+
+# ★ Windows 批处理必须用 CRLF
+# 原因：cmd.exe 解析 LF-only 的 .bat 会错位，表现为"每行开头被吞掉"，
+#       报诸如 'IAO72' 不是内部或外部命令 的离奇错误。
+#       （本仓库曾因此踩坑：run_asr.bat / start_xiao72.bat 双双失效）
+# 注意：这条必须放在 "* text=auto eol=lf" 之后，gitattributes 是后者覆盖前者。
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
