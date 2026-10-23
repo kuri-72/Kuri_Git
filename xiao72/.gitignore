@@ -5,3 +5,6 @@ firmware/*.obj
 firmware/*.exe
 firmware/*.pdb
 firmware/*.ilk
+
+# 录音样本（个人语音数据，不进仓库）
+voice/*.wav
