@@ -1,29 +1,29 @@
 @echo off
 chcp 65001 >nul 2>&1
-title XIAO72 VOICE
+title XIAO72 VOICE ASSISTANT
+rem ============================================================
+rem  Xiao72 voice assistant - one click launcher
+rem  Needs: E:\xiao72-venv  and  D:\AI_Cache\models
+rem ============================================================
 set PYTHONIOENCODING=utf-8
 set PYTHONUTF8=1
 set HF_HUB_DISABLE_SYMLINKS_WARNING=1
 set HF_HUB_DISABLE_XET=1
 set HF_ENDPOINT=https://huggingface.co
-if not defined HTTPS_PROXY set "HTTPS_PROXY=http://127.0.0.1:7897"
-if not defined HTTP_PROXY set "HTTP_PROXY=http://127.0.0.1:7897"
+set X72_MODEL_DIR=D:\AI_Cache\models
+rem NOTE: HTTPS_PROXY is intentionally NOT set here.
+rem   Models are already downloaded, so no proxy is needed at runtime.
+rem   Setting it would break DeepSeek calls whenever Clash is off.
+rem   To re-download models: open Clash, then run
+rem     set HTTPS_PROXY=http://127.0.0.1:7897
 cd /d "%~dp0"
-
-rem ---- 找 Python：仓库内 .venv -> 用户级 venv -> py 启动器（不写死任何绝对路径）----
-set "PY=%~dp0.venv\Scripts\python.exe"
-if not exist "%PY%" set "PY=%USERPROFILE%\xiao72-venv\Scripts\python.exe"
-if not exist "%PY%" set "PY="
-if not defined PY (where py >nul 2>&1 && set "PY=py")
-if not defined PY goto :nopy
-
-"%PY%" voice\run_voice.py %*
-pause
-exit /b 0
-
-:nopy
-echo [ERROR] 找不到 Python。
-echo   1. 装 Python 3.10+（记得勾 "Add to PATH"）
-echo   2. 或在项目根 .env 里写一行  X72_PYTHON=解释器完整路径
-pause
-exit /b 1
+if not exist "E:\xiao72-venv\Scripts\python.exe" (
+  echo [ERROR] venv not found: E:\xiao72-venv
+  pause
+  exit /b 1
+)
+"E:\xiao72-venv\Scripts\python.exe" voice\run_voice.py %*
+echo.
+echo ============================================================
+echo  Exited. Press any key to close this window.
+pause >nul
