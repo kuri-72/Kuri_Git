@@ -97,13 +97,16 @@ class VoiceAssistant:
                  silence_end_ms: int = 1200,
                  timeout: float = 30.0,
                  use_llm: bool = True,
-                 verbose: bool = False):
+                 verbose: bool = False,
+                 device: str | None = None):
         self.model_name = model
         self.asr_device = asr_device
         self.compute_type = compute_type
         self.model_dir = model_dir
         self.audio_device = audio_device
         self.port = port
+        self.device = device          # 期望的设备身份（id 或 model 片段）
+        self.device_info = None       # 握手拿到的身份信息
         self.dry_run = dry_run
         self.language = language
         self.silence_end_ms = silence_end_ms
@@ -123,6 +126,72 @@ class VoiceAssistant:
         self.unknown = 0
         self.errors = 0
         self.degraded_count = 0
+
+    # ================================================================
+    #  串口发现（靠握手，不靠 COM 号）
+    # ================================================================
+    def _discover_port(self) -> str | None:
+        """遍历串口逐个发 `[I?]`，按设备自报的身份找到它。
+
+        为什么不能写死 COM 号：
+            CH340 这类芯片没有 USB 序列号，COM 号随插拔顺序变化
+            （本机实测从 COM8 变成过 COM11）。
+            设备自己报名是唯一稳定的办法。
+
+        选择规则：
+            · 指定了 self.device → 按 id / model 片段匹配（大小写不敏感）
+            · 未指定 → 只有**恰好一个**设备应答时才采用；
+              多个应答则列出并拒绝猜，避免控制到错误的板子。
+        """
+        print("      按设备身份发现（遍历串口发 [I?]，不依赖 COM 号）…")
+        try:
+            from device_id import scan_ports
+        except Exception as e:
+            print(f"      [WARN] 无法导入 device_id：{e}")
+            return None
+
+        try:
+            hits = scan_ports()
+        except Exception as e:
+            print(f"      [WARN] 扫描串口失败：{e}")
+            return None
+
+        if not hits:
+            print("      没有任何设备回应握手。可能原因：")
+            print("        · 板子没上电 / 串口被占用")
+            print("        · 固件较老，没有 [I?] 应答（需 `[I?]` 版本固件）")
+            print("      可用 --port COMx 手动指定端口")
+            return None
+
+        def desc(d):
+            return (f"{d['port']}  {d.get('model','?')}  "
+                    f"id={d.get('id','?')}  fw={d.get('firmware','?')}")
+
+        # 指定身份 → 过滤
+        if self.device:
+            key = self.device.lower()
+            matched = [d for d in hits
+                       if key in str(d.get("id", "")).lower()
+                       or key in str(d.get("model", "")).lower()]
+            if not matched:
+                print(f"      未找到身份匹配 {self.device!r} 的设备。当前在线的有：")
+                for d in hits:
+                    print(f"        {desc(d)}")
+                return None
+            hits = matched
+
+        if len(hits) > 1:
+            print(f"      发现 {len(hits)} 个设备，为避免控制错板子，请用 --device 指定：")
+            for d in hits:
+                print(f"        {desc(d)}")
+            return None
+
+        self.device_info = hits[0]
+        d = hits[0]
+        print(f"      发现设备：{d['port']}  {d.get('model','?')}  "
+              f"id={d.get('id','?')}  fw={d.get('firmware','?')}")
+        print(f"      能力：{','.join(d.get('capabilities') or [])}")
+        return d["port"]
 
     # ================================================================
     #  初始化
@@ -180,18 +249,23 @@ class VoiceAssistant:
         print("\n[4/4] 串口")
         if self.dry_run:
             print("      DRY-RUN：只打印帧，不发送")
-        elif self.port:
-            try:
-                self.link = SerialLink(self.port, 115200, timeout=0.5).open()
-                print(f"      {self.port} 已连接")
-            except Exception as e:
-                print(f"      [WARN] 打开 {self.port} 失败：{e}")
-                print("             常见原因：串口助手占用 / 板子没插")
-                print("             将进入 DRY-RUN 模式（只打印帧）")
-                self.dry_run = True
         else:
-            self.dry_run = True
-            print("      未指定端口 → DRY-RUN")
+            # port 为 None 或 "auto" 时：靠握手认设备，不认 COM 号
+            if self.port is None or str(self.port).lower() == "auto":
+                self.port = self._discover_port()
+
+            if self.port:
+                try:
+                    self.link = SerialLink(self.port, 115200, timeout=0.5).open()
+                    print(f"      {self.port} 已连接")
+                except Exception as e:
+                    print(f"      [WARN] 打开 {self.port} 失败：{e}")
+                    print("             常见原因：串口助手占用 / 板子没插")
+                    print("             将进入 DRY-RUN 模式（只打印帧）")
+                    self.dry_run = True
+            else:
+                self.dry_run = True
+                print("      未找到设备 → DRY-RUN（只打印帧）")
 
         print("\n" + "-" * 72)
         print("  准备好了。说完话停顿约 %.1f 秒自动识别。" % (self.silence_end_ms / 1000))

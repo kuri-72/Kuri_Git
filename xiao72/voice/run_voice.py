@@ -55,14 +55,17 @@ def _detect_port() -> str:
 
 
 MODEL_DIR = os.environ.get("X72_MODEL_DIR") or _default_model_dir()
-DEFAULT_PORT = os.environ.get("X72_PORT") or _detect_port()
+DEFAULT_PORT = os.environ.get("X72_PORT") or "auto"
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="小72 语音闭环")
     ap.add_argument("--text", action="store_true", help="文字模式：打字代替说话")
     ap.add_argument("--dry-run", action="store_true", help="只打印帧，不发送串口")
-    ap.add_argument("--port", default=DEFAULT_PORT, help=f"串口（默认 {DEFAULT_PORT}）")
+    ap.add_argument("--port", default=DEFAULT_PORT,
+                    help="auto（默认）靠握手发现设备；也可指定 COMx")
+    ap.add_argument("--target", default=None,
+                    help="期望的设备身份（id 或 model 片段），多设备时必填")
     ap.add_argument("--input", default=None, help="麦克风：索引或名称片段")
     ap.add_argument("--model", default="small", help="ASR 模型：tiny/base/small/medium/large-v3")
     ap.add_argument("--device", default="cpu", help="ASR 设备：cpu / cuda")
@@ -86,6 +89,7 @@ def main() -> int:
         model_dir=MODEL_DIR,
         audio_device=args.input,
         port=None if args.dry_run else args.port,
+        device=args.target,
         dry_run=args.dry_run,
         language=None if args.language == "auto" else args.language,
         silence_end_ms=args.silence_end,
