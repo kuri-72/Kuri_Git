@@ -32,8 +32,8 @@ def run_c(lines: list[str]) -> list[tuple[int, int]]:
         raise FileNotFoundError(
             f"没找到 {SIM}\n"
             "先在 firmware 目录编译模拟器：\n"
-            "  cl /nologo /wd4819 /DX72_NO_PORT /Fe:sim.exe sim_main.c x72_proto.c\n"
-            "  gcc -DX72_NO_PORT -I. sim_main.c x72_proto.c -o sim.exe"
+            "  cl /nologo /wd4819 /DX72_NO_PORT /Fe:sim.exe sim\sim_main.c x72_proto.c\n"
+            "  gcc -DX72_NO_PORT -I. sim\sim_main.c x72_proto.c -o sim.exe"
         )
     inp = "\n".join(lines) + "\n"
     out = subprocess.run([str(SIM)], input=inp, capture_output=True,

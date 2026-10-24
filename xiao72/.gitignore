@@ -1,4 +1,4 @@
-﻿.env
+.env
 __pycache__/
 *.pyc
 firmware/*.obj
@@ -8,3 +8,27 @@ firmware/*.ilk
 
 # 录音样本（个人语音数据，不进仓库）
 voice/*.wav
+# ============ Keil MDK 编译产物 ============
+# 这些文件每次编译都会重建，提交上去只会让仓库膨胀 26MB 并产生无意义 diff
+Objects/
+Listings/
+DebugConfig/
+*.hex
+*.bin
+*.axf
+*.o
+*.d
+*.crf
+*.dep
+*.lnp
+*.htm
+*.map
+*.lst
+*.sct
+*.scvd
+JLinkLog.txt
+EventRecorderStub.scvd
+Project.uvguix.*
+*.bak
+*.bak2
+*.orig

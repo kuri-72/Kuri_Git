@@ -74,6 +74,8 @@
 
 ---
 
+> **Keil 工程怎么用**：见 [KEIL_SETUP.md](KEIL_SETUP.md)（工程位置、编译单元清单、命令行编译烧录）。
+
 ## 四、三个入口（你日常只用一个）
 
 | 命令 | 用途 | 什么时候用 |
@@ -106,7 +108,7 @@
 |---|---|---|
 | `docs/protocol.md` | 协议唯一标准 | 改一处忘另一处 → 两端打架 |
 | `host/verify.py` | 两端一致性测试 | 协议静默不匹配，调试 3 天 |
-| `firmware/sim_main.c` | PC 上跑单片机解析器 | 每次改解析都要烧板子 |
+| `firmware/sim/sim_main.c` | PC 上跑单片机解析器 | 每次改解析都要烧板子 |
 | `.gitattributes` | 保证 .bat 是 CRLF | 换电脑 bat 全废 |
 | 三设备 Git 同步 | 代码不丢 | 换电脑从零开始 |
 

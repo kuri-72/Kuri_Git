@@ -14,6 +14,7 @@
  * 单生产者（中断）+ 单消费者（主循环），不需要关中断保护：
  * head 只由中断写，tail 只由主循环写，8 位变量读写天然原子。
  */
+#include <stddef.h>   /* NULL */
 #include "x72_port.h"
 
 #define RX_MASK (X72_RX_BUF_SIZE - 1u)

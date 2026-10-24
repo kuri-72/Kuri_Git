@@ -116,7 +116,7 @@ cd ..\firmware
 打开一个 **"x64 Native Tools Command Prompt for VS 2022"**（开始菜单搜 `x64 Native`），cd 到 firmware 目录：
 
 ```
-cl /nologo /wd4819 /DX72_NO_PORT /Fe:sim.exe sim_main.c x72_proto.c
+cl /nologo /wd4819 /DX72_NO_PORT /Fe:sim.exe sim\sim_main.c x72_proto.c
 ```
 
 然后：
@@ -171,7 +171,7 @@ python verify.py
 
 ### 2.4 把 3 个端口函数复制进你的工程
 
-打开 `xiao72\firmware\x72_port_stm32.c`，**不要整个加进工程**（会和你的中断函数重复定义）。
+打开 `xiao72\firmware\template\x72_port_stm32.c`，**不要整个加进工程**（会和你的中断函数重复定义）。
 
 需要复制到你现有某个 `.c` 文件里的，只有这 3 个函数：
 
@@ -265,7 +265,7 @@ GND        ──────►  GND      ← 必须接！否则收不到数据
 - 波特率 **115200**
 - 开了 **RXNE 接收中断**
 
-如果没有，就用 `x72_port_stm32.c` 里我写的 `x72_usart1_init(115200)`，但**注意**它里面有 `USART1_IRQHandler`，别和你工程里已有的重复。
+如果没有，就用 `template\x72_port_stm32.c` 里我写的 `x72_usart1_init(115200)`，但**注意**它里面有 `USART1_IRQHandler`，别和你工程里已有的重复。
 
 ### 3.3 主循环
 

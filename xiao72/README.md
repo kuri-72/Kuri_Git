@@ -37,8 +37,8 @@ xiao72/
 └─ firmware/             单片机端（C，标准库）
    ├─ x72_proto.h        对外接口
    ├─ x72_proto.c        解析器 + 非阻塞呼吸（核心，2KB 以内）
-   ├─ x72_port_stm32.c   平台适配（你只改这 3 个函数）
-   └─ sim_main.c         PC 模拟器（不需要板子就能测试）
+   ├─ template/x72_port_stm32.c  平台适配（模板，不要整体加进工程）
+   └─ sim/sim_main.c     PC 模拟器（不需要板子就能测试）
 ```
 
 ---
@@ -74,8 +74,8 @@ python main.py --mock --dry-run --demo
 ```powershell
 # 先编译模拟器
 cd xiao72\firmware
-cl /nologo /wd4819 /DX72_NO_PORT /Fe:sim.exe sim_main.c x72_proto.c   # VS
-# 或 gcc -DX72_NO_PORT -I. sim_main.c x72_proto.c -o sim.exe
+cl /nologo /wd4819 /DX72_NO_PORT /Fe:sim.exe sim\sim_main.c x72_proto.c   # VS
+# 或 gcc -DX72_NO_PORT -I. sim\sim_main.c x72_proto.c -o sim.exe
 
 cd ..\host
 python verify.py
@@ -127,7 +127,7 @@ python main.py --port COM3    # 真发串口
 ## 周六上板要做的三件事
 
 ### ① Keil 工程里加入文件
-把 `x72_proto.c`、`x72_proto.h` 加入工程；`x72_port_stm32.c` **只抄里面的函数**（不要整个加，避免和你的 `SysTick_Handler`、`USART1` 冲突）。
+把 `x72_proto.c`、`x72_proto.h` 加入工程；`template/x72_port_stm32.c` **只抄里面的函数**（不要整个加，避免和你的 `SysTick_Handler`、`USART1` 冲突）。
 
 ### ② 确认三个适配点
 | 位置 | 要确认 |

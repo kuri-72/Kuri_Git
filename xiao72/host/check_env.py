@@ -96,7 +96,7 @@ def main() -> int:
         (HERE / "main.py", "CLI 入口"),
         (FIRMWARE / "x72_proto.c", "单片机解析器"),
         (FIRMWARE / "x72_proto.h", "单片机接口"),
-        (FIRMWARE / "x72_port_stm32.c", "平台适配层"),
+        (FIRMWARE / "template" / "x72_port_stm32.c", "平台适配层"),
     ]
     for path, desc in need:
         if path.exists():
