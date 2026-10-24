@@ -28,8 +28,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # 默认模型下载目录，跟 .env / 系统环境变量保持一致
 import os
+try:
+    from host.config import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
-MODEL_DIR = os.environ.get("X72_MODEL_DIR", r"D:\AI_Cache\models")
+
+
+def _default_model_dir() -> str:
+    base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    return os.path.join(base, "xiao72", "models")
+
+
+MODEL_DIR = os.environ.get("X72_MODEL_DIR") or _default_model_dir()
 
 
 def main() -> int:

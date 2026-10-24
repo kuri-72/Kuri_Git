@@ -22,10 +22,40 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+# 统一从项目根 .env 读本机配置；.env 里没有才用下面的默认值
+try:
+    from host.config import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 
-MODEL_DIR = os.environ.get("X72_MODEL_DIR", r"D:\AI_Cache\models")
-DEFAULT_PORT = os.environ.get("X72_PORT", "COM8")
+
+def _default_model_dir() -> str:
+    """模型缓存目录：优先 LOCALAPPDATA，不写死盘符。"""
+    base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    return os.path.join(base, "xiao72", "models")
+
+
+def _detect_port() -> str:
+    """没配 X72_PORT 时按描述找 CH340 / USB 串口。"""
+    try:
+        from serial.tools import list_ports  # type: ignore
+    except ImportError:
+        return "COM1"
+    ports = list(list_ports.comports())
+    for p in ports:
+        if "CH340" in (p.description or "").upper():
+            return p.device
+    for p in ports:
+        if "USB" in (p.description or "").upper():
+            return p.device
+    return "COM1"
+
+
+MODEL_DIR = os.environ.get("X72_MODEL_DIR") or _default_model_dir()
+DEFAULT_PORT = os.environ.get("X72_PORT") or _detect_port()
 
 
 def main() -> int:

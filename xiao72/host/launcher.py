@@ -22,7 +22,32 @@ HERE = Path(__file__).resolve().parent
 PROJECT = HERE.parent
 ENV_FILE = PROJECT / ".env"
 
-DSH_PYTHON = Path(r"C:\Users\ROG\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe")
+
+def read_env(key: str):
+    """从 .env 读一个键（只读，不污染 os.environ）。"""
+    if not ENV_FILE.exists():
+        return None
+    for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line.startswith(key + "="):
+            return line.split("=", 1)[1].strip() or None
+    return None
+
+
+def find_python() -> str:
+    """解释器优先级：.env 的 X72_PYTHON → 用户级 venv → 仓库内 .venv → 当前解释器。
+
+    不写死任何绝对路径：换机器时只要 .env 里换一行。
+    """
+    candidates = [
+        read_env("X72_PYTHON"),
+        str(Path.home() / "xiao72-venv" / "Scripts" / "python.exe"),
+        str(PROJECT / ".venv" / "Scripts" / "python.exe"),
+    ]
+    for c in candidates:
+        if c and Path(c).exists():
+            return c
+    return sys.executable
 
 
 def pause(msg: str = "\n按任意键关闭窗口…") -> None:
@@ -30,24 +55,6 @@ def pause(msg: str = "\n按任意键关闭窗口…") -> None:
         input(msg)
     except (EOFError, KeyboardInterrupt):
         pass
-
-
-def find_python() -> str:
-    """优先用 DSH 内置解释器，它保证有 openai/pyserial。"""
-    if DSH_PYTHON.exists():
-        return str(DSH_PYTHON)
-    return sys.executable
-
-
-def read_env_port() -> str | None:
-    """从 .env 读 X72_PORT（如果配了）。"""
-    if not ENV_FILE.exists():
-        return None
-    for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line.startswith("X72_PORT="):
-            return line.split("=", 1)[1].strip() or None
-    return None
 
 
 def detect_port(hint: str | None) -> str | None:
@@ -82,7 +89,7 @@ def main() -> int:
     args = sys.argv[1:]
     port_arg = next((a for a in args if a.upper().startswith("COM")), None)
 
-    port = port_arg or detect_port(read_env_port())
+    port = port_arg or detect_port(read_env("X72_PORT"))
     if port is None:
         print("\n[!] 没检测到串口设备。")
         print("    1. 确认 USB 转串口已插好")
