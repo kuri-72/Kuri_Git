@@ -158,12 +158,22 @@ git clone https://github.com/kuri-72/Kuri_Git.git
 | 第 2 轮 Q1 改动后 | 改引用 `..\main_project.c`、删 `User\main.c`、开机帧改 `X72_BOOT_FRAME`（默认关） |
 | 改动后编译 | **0 Error / 0 Warning**，Code=6456（少 88 字节，因开机帧未编入） |
 | 改动后烧录 | `Programming Done. Verify OK.` |
-| 改动后握手 | `[I x72-led\|X72-LED\|1.0\|led,brightness,period]` |
-| 烧录 | `Programming Done. Verify OK.` |
-| 握手验证 | `[I x72-led|X72-LED|1.0|led,brightness,period]` ✅ |
+| 改动后握手 | `[I x72-led\|X72-LED\|1.0\|led,brightness,period]` ✅ |
 
-> **教训**：掌机没有 C 编译器，它改的固件代码未经编译验证。
-> 跨设备协作时，**必须由有工具链的一方做编译验证**。
+### 掌机独立复现（2026-10-25 04:05）
+
+| 项 | 结果 |
+|---|---|
+| Keil | UV4 **5.24.2.0**，安装于 `C:\Nerv32\UV4`（笔记本为 `E:\Nerv32\UV4`，仅盘符不同） |
+| 命令 | `UV4.exe -b Project.uvprojx -j0 -o build.log` |
+| 结果 | **0 Error / 0 Warning**，Code=6456 RO=1788 RW=64 ZI=1744，8s |
+| FilePath 核对 | 74/74 全部存在，0 缺失 |
+| 旧副本 | `User\main.c`、`stm32_keil\Xiao72\` 均已删除，无残留引用 |
+| 编译产物 | `Objects/Project.axf` 被 `.gitignore` 正确忽略 |
+
+> **更正**：本文件上一版写着"掌机没有 C 编译器"，是错的——掌机同样装有 Keil（UV4 5.24.2.0）。
+> 正确约定：**改动共享源码或工程文件的一方，必须自证 F7 通过**；无法编译时在 commit message 里标 `[未编译验证]`。
+
 ---
 
 ## 10. 协作约定（2026-10-25 第 2 轮共识）
