@@ -192,10 +192,50 @@ static x72_status_t parse_json(const char *buf, uint16_t len)
 /* ================================================================
  *  统一入口
  * ================================================================ */
+
+/* ---- 身份握手：[I?] ----
+ * 应答格式 "[I <id>|<model>|<ver>|<caps>]"，不含换行（换行由 PC 侧容忍）。
+ * 老 PC 端不认识这条应答，但那时根本不会发 [I?]，所以双向兼容。
+ */
+static uint16_t id_put(char *out, uint16_t pos, uint16_t cap, const char *s)
+{
+    if (s == NULL) return pos;
+    while (*s != '\0' && (uint16_t)(pos + 1u) < cap) {
+        out[pos++] = *s++;
+    }
+    out[pos] = '\0';
+    return pos;
+}
+
+static x72_status_t x72_identify(void)
+{
+    char reply[96];
+    uint16_t p = 0;
+    uint16_t cap = (uint16_t)sizeof(reply);
+
+    p = id_put(reply, p, cap, "[I ");
+    p = id_put(reply, p, cap, X72_DEVICE_ID);
+    p = id_put(reply, p, cap, "|");
+    p = id_put(reply, p, cap, X72_DEVICE_MODEL);
+    p = id_put(reply, p, cap, "|");
+    p = id_put(reply, p, cap, X72_PROTO_VER);
+    p = id_put(reply, p, cap, "|");
+    p = id_put(reply, p, cap, X72_DEVICE_CAPS);
+    (void)id_put(reply, p, cap, "]");
+
+    x72_send_line(reply);
+    return X72_OK;
+}
+
 static x72_status_t dispatch_line(const char *buf, uint16_t len)
 {
     uint16_t i;
     x72_status_t st;
+
+    /* ---- 身份握手：只认行首的 [I ---- */
+    if (len >= 2 && buf[0] == '[' && buf[1] == 'I') {
+        return x72_identify();
+    }
 
     for (i = 0; i < len; i++) {
         if (buf[i] == '[') {

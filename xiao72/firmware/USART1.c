@@ -117,3 +117,22 @@ uint8_t x72_rx_overflow(void)
 {
     return s_overflow;
 }
+
+/* ================================================================
+ *  发送（身份握手应答用）
+ * ================================================================
+ *  阻塞发送一行。只在收到 "[I?" 时调用，最长约 60 字节，
+ *  115200 下约 5ms，不会影响 1ms 的呼吸算法。
+ *  不要在中段里调用。
+ */
+void x72_send_line(const char *line)
+{
+    if (line == NULL) return;
+    while (*line != '\0') {
+        while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET) {
+        }
+        USART_SendData(USART1, (uint8_t)(*line++));
+    }
+    while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET) {
+    }
+}

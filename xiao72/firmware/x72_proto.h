@@ -82,6 +82,26 @@ uint32_t x72_tick_ms(void);              /* 毫秒计时                     */
 void     x72_led_write(uint16_t level);  /* 内部刻度 0..1000 → PWM       */
 void     x72_on_error(x72_status_t err); /* 错误上报（可空）             */
 
+/* ---------------- 身份握手（v0.4） ----------------
+ * PC 发 "[I?"，设备回 "[I <id>|<model>|<版本>|<能力清单>]"
+ * 目的：CH340 这类芯片没有 USB 序列号，靠设备自报身份来区分多台设备。
+ * 身份可在编译选项里覆盖，不用改源码。
+ */
+#define X72_PROTO_VER    "1.0"
+
+#ifndef X72_DEVICE_ID
+#define X72_DEVICE_ID    "x72-led"
+#endif
+#ifndef X72_DEVICE_MODEL
+#define X72_DEVICE_MODEL "X72-LED"
+#endif
+#ifndef X72_DEVICE_CAPS
+#define X72_DEVICE_CAPS  "led,brightness,period"
+#endif
+
+/** 平台钩子：阻塞发送一行（不含换行符）。由 USART1.c 实现。 */
+void x72_send_line(const char *line);
+
 /* 仅 PC 模拟器使用：见 x72_proto.c 的 X72_NO_PORT 分支 */
 void x72_sim_set_tick(uint32_t t);
 
