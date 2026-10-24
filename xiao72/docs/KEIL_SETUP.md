@@ -23,35 +23,39 @@ xiao72/firmware/
 │   ├── System/           Delay
 │   ├── Hardware/         LED / Key / OLED / PWM
 │   ├── User/             main.c / stm32f10x_it.c / conf.h
-│   └── Xiao72/           ⚠ 旧副本，验证通过后可删（见第 6 节）
+│   └── (无 Xiao72/ 目录，旧副本已删)
 ├── sim/sim_main.c        PC 模拟器（不进 Keil 工程）
 └── template/x72_port_stm32.c  参考实现（不进 Keil 工程）
 ```
 
-**关键设计**：`stm32_keil/Project.uvprojx` 里 7 个 Xiao72 文件用的是
-**相对路径 `..\x72_proto.c`**，指向上级 `firmware/` 目录。
+**关键设计**：`stm32_keil/Project.uvprojx` 里的共享源码用的是
+**相对路径 `..\x72_proto.c` / `..\main_project.c`**，指向上级 `firmware/` 目录。
 所以**源码只有一份**，Keil 里编辑就是编辑共享文件。
 
 ---
 
 ## 2. 编译单元清单（重要，加错会链接失败）
 
-**必须加入**（`Xiao72` 组）：
+**必须加入**（`User` 组放 main，`Xiao72` 组放协议与硬件）：
 
 ```
-x72_proto.c   x72_proto.h
-x72_port.c    x72_port.h
-USART1.c
-x72_app.c     x72_app.h
+..\main_project.c          ← 主循环（唯一 main，原 User\main.c 已删）
+..\x72_proto.c  ..\x72_proto.h
+..\x72_port.c   ..\x72_port.h
+..\USART1.c
+..\x72_app.c    ..\x72_app.h
 ```
 
 **绝对不能加**（会重复定义）：
 
 | 文件 | 为什么 |
 |---|---|
-| `main_project.c` | 它是参考模板，和 `User/main.c` 都定义 `main()` → `L6200E` |
-| `sim/sim_main.c` | 同上，PC 模拟器专用 |
+| `sim/sim_main.c` | 它有自己的 `main()`，与 `main_project.c` 冲突 → `L6200E` |
 | `template/x72_port_stm32.c` | 与 `USART1.c`/`x72_port.c` 重复定义 `USART1_IRQHandler`、`x72_tick_ms`、`x72_led_write` |
+
+> **历史教训**：曾经 `main_project.c` 与 `User\main.c` 同时存在（只差一行开机帧），
+> 工程实际编译的是 `User\main.c`，导致"改了 `main_project.c` 却不生效"的陷阱。
+> 现已统一为 `main_project.c` 一份。
 
 ---
 
@@ -105,20 +109,15 @@ PC  → [I?\n
 
 ---
 
-## 6. `Xiao72/` 旧副本怎么处理
+## 6. 源码唯一真源
 
-建工程时曾把 7 个源文件复制进 `stm32_keil/Xiao72/`。
-现在工程已改为引用 `..\`，这个目录**不再参与编译**。
+**唯一真源是 `xiao72/firmware/`**（含 `main_project.c` 与 7 个共享源文件）。
 
-- **暂不删除**，作为回滚保险。
-- 确认新路径编译 + 烧录 + 灯正常后，可执行：
-  ```powershell
-  Remove-Item -Recurse -Force E:\kuri\xiao72\firmware\stm32_keil\Xiao72
-  ```
-- 注意：删掉后若有人把工程 FilePath 改回 `.\Xiao72\`，会找不到文件。
+- `stm32_keil/` 里**不再保存任何源码副本**（旧 `Xiao72/` 目录已于 2026-10-25 删除）
+- 工程通过 `..\xxx.c` 相对路径引用上级目录
+- 因此：**在 Keil 里编辑源码 = 编辑仓库里的文件**，不会出现两份漂移
 
----
-
+若要新增源文件，请加到 `xiao72/firmware/`，再把工程的 `<FilePath>` 指到 `..\新文件.c`。
 ## 7. .gitignore 规则（Keil 部分）
 
 `Objects/` 单目录就有 **26.1 MB**，必需排除。完整规则见 `xiao72/.gitignore`：
@@ -156,8 +155,35 @@ git clone https://github.com/kuri-72/Kuri_Git.git
 | 修复 | `USART1.c` 补 `#include <stddef.h>` |
 | 复编 | **0 Error / 0 Warning** |
 | 代码尺寸 | Code=6544  RO-data=1788  RW-data=64  ZI-data=1744 |
+| 第 2 轮 Q1 改动后 | 改引用 `..\main_project.c`、删 `User\main.c`、开机帧改 `X72_BOOT_FRAME`（默认关） |
+| 改动后编译 | **0 Error / 0 Warning**，Code=6456（少 88 字节，因开机帧未编入） |
+| 改动后烧录 | `Programming Done. Verify OK.` |
+| 改动后握手 | `[I x72-led\|X72-LED\|1.0\|led,brightness,period]` |
 | 烧录 | `Programming Done. Verify OK.` |
 | 握手验证 | `[I x72-led|X72-LED|1.0|led,brightness,period]` ✅ |
 
 > **教训**：掌机没有 C 编译器，它改的固件代码未经编译验证。
 > 跨设备协作时，**必须由有工具链的一方做编译验证**。
+---
+
+## 10. 协作约定（2026-10-25 第 2 轮共识）
+
+| 约定 | 内容 |
+|---|---|
+| **谁改谁编译** | 改工程或共享源码的一方，push 前必须自己 F7 一次 |
+| **必须贴摘要** | `0 Error / 0 Warning` + 代码尺寸 |
+| **无法编译要声明** | commit message 含 `[未编译验证]`，不得默认通过 |
+| **uvprojx 改动** | 由改动方负责 F7 |
+| **先 pull 再改** | 改共享文件前先 `git pull`；冲突就地合并，不覆盖对方 |
+| **开机行为** | `X72_BOOT_FRAME` 默认关闭；开关语义见下 |
+
+### 宏开关语义（别混用）
+
+| 宏 | 语义 | 默认 |
+|---|---|---|
+| `X72_SELF_TEST` | 跑自检：周期性重复注入测试帧 | 关闭 |
+| `X72_BOOT_FRAME` | 产品行为：上电点亮一帧 `[L01002000\|A---\|]`（100%/2s） | **关闭** |
+| `X72_USE_OLED` | 是否启用 OLED 显示 | 见源码默认 |
+
+> 为什么 `X72_BOOT_FRAME` 默认关：开机强制 100%/2s 会**覆盖用户上次设定**，
+> 与"各模块各司其职、没提到就不动"的原则冲突。演示"上电即亮"时才打开。

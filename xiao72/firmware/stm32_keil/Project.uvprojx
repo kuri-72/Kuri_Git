@@ -716,9 +716,9 @@
           <GroupName>User</GroupName>
           <Files>
             <File>
-              <FileName>main.c</FileName>
+              <FileName>main_project.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\User\main.c</FilePath>
+              <FilePath>..\main_project.c</FilePath>
             </File>
             <File>
               <FileName>stm32f10x_conf.h</FileName>
