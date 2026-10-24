@@ -1,0 +1,38 @@
+#!/bin/sh
+# 提交前拦截真实密钥。启用：git config core.hooksPath .githooks
+# 绕过：git commit --no-verify（不推荐）
+
+fail=0
+
+# 1) .env 一律不许入库
+env_hit=$(git diff --cached --name-only | grep -E "(^|/)\.env$" || true)
+if [ -n "$env_hit" ]; then
+  echo "!! 拒绝提交：.env 不应该进仓库" >&2
+  echo "$env_hit" >&2
+  fail=1
+fi
+
+# 2) 暂存区里的疑似真实密钥（sk- 后跟 16 位以上字母数字）
+#    排除 .env.example（里面是 sk-xxxxxxx 占位符）
+key_hit=$(git grep --cached -n -I -E "sk-[A-Za-z0-9]{16,}" -- . ":(exclude)xiao72/.env.example" 2>/dev/null || true)
+if [ -n "$key_hit" ]; then
+  echo "!! 拒绝提交：暂存区里疑似有真实 API Key" >&2
+  echo "$key_hit" >&2
+  fail=1
+fi
+
+# 3) X72_API_KEY 被填了非空值（文档/示例除外）
+api_hit=$(git grep --cached -n -I -E "^X72_API_KEY=.+" -- . ":(exclude)xiao72/.env.example" ":(exclude)*.md" 2>/dev/null || true)
+if [ -n "$api_hit" ]; then
+  echo "!! 拒绝提交：X72_API_KEY 被填了真实值" >&2
+  echo "$api_hit" >&2
+  fail=1
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo "" >&2
+  echo "如果确认是误报，可用：git commit --no-verify" >&2
+  exit 1
+fi
+
+exit 0
