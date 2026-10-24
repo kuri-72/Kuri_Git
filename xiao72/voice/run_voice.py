@@ -54,8 +54,28 @@ def _detect_port() -> str:
     return "COM1"
 
 
+def _resolve_port() -> str:
+    """端口优先级：X72_PORT（且当前真实存在）> auto（靠握手发现）。
+
+    配了 X72_PORT 但设备没插上、或插拔后口号变了，就回退到 auto，
+    避免把 COM13 写死在 .env 里之后，换一次接口就打不开。
+    """
+    want = os.environ.get("X72_PORT")
+    if not want:
+        return "auto"
+    try:
+        from serial.tools import list_ports  # type: ignore
+        ports = list(list_ports.comports())
+    except ImportError:
+        return want
+    for p in ports:
+        if p.device.upper() == want.upper():
+            return want
+    return "auto"
+
+
 MODEL_DIR = os.environ.get("X72_MODEL_DIR") or _default_model_dir()
-DEFAULT_PORT = os.environ.get("X72_PORT") or "auto"
+DEFAULT_PORT = _resolve_port()
 
 
 def main() -> int:
