@@ -286,6 +286,11 @@ class VoiceAssistant:
             max_utterance_ms=self.max_utterance_ms,
         )
 
+    def _context(self) -> str:
+        """把当前灯状态作为上下文喂给模型，闲聊时也能回答「现在多亮」。"""
+        st = self.state
+        return "亮度 %d%%，周期 %dms" % (st.brightness, st.period_ms)
+
     def understand(self, text: str) -> tuple[object, bool]:
         """文字 → 意图。返回 (Intent, 是否降级)。
 
@@ -293,7 +298,7 @@ class VoiceAssistant:
         """
         if self.llm is not None:
             try:
-                return self.llm.parse(text), False
+                return self.llm.parse(text, context=self._context()), False
             except IntentError as e:
                 if self.verbose:
                     print(f"      [LLM 失败] {str(e)[:80]}")
@@ -314,8 +319,8 @@ class VoiceAssistant:
         )
         frame = self.state.encode()
 
-        # unknown 不动硬件：不发送，保持原状态
-        if cmd == "unknown":
+        # unknown / chat 不动硬件：不发送，保持原状态
+        if cmd in ("unknown", "chat"):
             return "", changed
 
         if self.dry_run or self.link is None:

@@ -62,7 +62,7 @@ class LedState:
     def apply(self, cmd: str, brightness: int | None, period_ms: int | None) -> list[str]:
         """把意图合并进状态，返回"真正变化的字段名"。"""
         changed: list[str] = []
-        if cmd == "unknown":
+        if cmd in ("unknown", "chat"):
             return changed                       # ★ 不改变任何东西
 
         if cmd == "off":

@@ -19,7 +19,7 @@ from typing import Any
 
 from config import Config, load_system_prompt
 
-VALID_CMDS = {"set_led", "breath", "off", "unknown"}
+VALID_CMDS = {"set_led", "breath", "off", "unknown", "chat"}
 
 
 @dataclass
@@ -115,7 +115,7 @@ def normalize(obj: dict[str, Any]) -> Intent:
         cmd = alias.get(cmd, "unknown")
         repaired.append(f"cmd 归一化 → {cmd}")
 
-    say = str(obj.get("say", "")).strip().replace("\n", " ")[:60]
+    say = str(obj.get("say", "")).strip().replace("\n", " ")[:120]
 
     brightness = None
     period_ms = None
@@ -145,6 +145,7 @@ def normalize(obj: dict[str, Any]) -> Intent:
             "breath": f"呼吸模式 {period_ms}ms",
             "off": "已关灯",
             "unknown": "没听懂，试试：调亮/调暗/关灯/呼吸",
+            "chat": "嗯，我在听",
         }[cmd]
         repaired.append("say 为空，已补默认话术")
 
@@ -190,7 +191,7 @@ class IntentParser:
         )
         return self._client
 
-    def parse(self, user_text: str) -> Intent:
+    def parse(self, user_text: str, context: str | None = None) -> Intent:
         user_text = (user_text or "").strip()
         if not user_text:
             return Intent(cmd="unknown", brightness=None, period_ms=None,
@@ -198,6 +199,8 @@ class IntentParser:
 
         client = self._ensure_client()
         messages: list[dict[str, str]] = [{"role": "system", "content": self.system_prompt}]
+        if context:
+            messages.append({"role": "system", "content": f"当前设备状态：{context}"})
         if self.keep_history:
             messages.extend(self._history[-6:])
         messages.append({"role": "user", "content": user_text})
@@ -235,7 +238,7 @@ class MockParser:
     在不接 AI 的情况下也能跑通、可回归测试。
     """
 
-    def parse(self, user_text: str) -> Intent:
+    def parse(self, user_text: str, context: str | None = None) -> Intent:
         t = user_text.strip()
         low = t.lower()
 
