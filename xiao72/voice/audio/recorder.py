@@ -149,13 +149,16 @@ class Recorder:
                          segmenter=None,
                          timeout: float = 30.0,
                          gain: bool = True,
-                         silence_end_ms: int = 1200) -> np.ndarray:
+                         silence_end_ms: int = 1200,
+                         max_utterance_ms: int = 10000) -> np.ndarray:
         """一直听，等你说完一句就返回（VAD 自动判断）。
 
         与 record(seconds) 的区别：
           · 不固定时长，你说多久就录多久
           · 说完（静音 silence_end_ms 毫秒）自动结束
           · pre-roll 避免丢开头，VAD 避免切掉结尾
+          · max_utterance_ms：硬上限。VAD 没判出句尾时也不会一直录到 timeout，
+            否则会长音频送进 Whisper，解码时间随长度线性增长（实测 30s 音频 ~20s）
 
         返回 float32 / 16k / 单声道；超时无语音则返回空数组。
         """
@@ -175,6 +178,8 @@ class Recorder:
 
         buf16 = np.zeros(0, dtype=np.float32)
         deadline = time.time() + timeout
+        max_samples = int(TARGET_SR * max_utterance_ms / 1000) if max_utterance_ms else 0
+        captured = 0
 
         with sd.InputStream(samplerate=self.sr, channels=1, dtype="float32",
                             blocksize=blocksize, device=self.device_index) as stream:
@@ -194,6 +199,11 @@ class Recorder:
                         if gain:
                             utt, _ = normalize_gain(utt)
                         return utt.astype(np.float32)
+
+                captured += x.size
+                if max_samples and captured >= max_samples:
+                    # 说太久 / VAD 没判出句尾：强制收尾，别让 ASR 解几十秒音频
+                    break
 
         # 超时：如果正在说话，强制输出已录到的部分
         tail = segmenter.flush()

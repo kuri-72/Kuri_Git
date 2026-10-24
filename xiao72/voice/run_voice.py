@@ -93,6 +93,9 @@ def main() -> int:
     ap.add_argument("--language", default="zh", help="语言，auto 自动检测")
     ap.add_argument("--silence-end", type=int, default=1200,
                     help="静音多少毫秒算说完（默认 1200）")
+    ap.add_argument("--max-utterance", type=int, default=10000,
+                    help="单句最长录音毫秒数（默认 10000）。VAD 没判出句尾时强制收尾，"
+                         "避免长音频拖慢 ASR")
     ap.add_argument("--timeout", type=float, default=30.0, help="单轮最长等待秒数")
     ap.add_argument("--no-llm", action="store_true", help="强制只用规则版（离线）")
     ap.add_argument("--verbose", action="store_true", help="打印 LLM 失败详情")
@@ -116,6 +119,7 @@ def main() -> int:
         timeout=args.timeout,
         use_llm=not args.no_llm,
         verbose=args.verbose,
+        max_utterance_ms=args.max_utterance,
     )
 
     try:

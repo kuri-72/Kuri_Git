@@ -53,6 +53,7 @@ class TurnResult:
     degraded: bool = False          # 是否用了规则版兜底
     error: str = ""
     t_vad: float = 0.0              # 从开始等到切出一句（含用户说话时间）
+    audio_s: float = 0.0            # 这一轮实际送进 ASR 的音频长度（秒）
     t_asr: float = 0.0
     t_intent: float = 0.0
     t_act: float = 0.0              # 生成帧 + 串口下发
@@ -70,9 +71,10 @@ class TurnResult:
             parts.append("注：LLM 不可用，用的规则版")
         if self.error:
             parts.append(f"错误：{self.error}")
+        audio_note = f"（音频 {self.audio_s:.1f}s）" if self.audio_s else ""
         parts.append(
             f"耗时：ASR {self.t_asr:.2f}s + 意图 {self.t_intent:.2f}s "
-            f"+ 下发 {self.t_act:.2f}s = {self.t_total:.2f}s"
+            f"+ 下发 {self.t_act:.2f}s = {self.t_total:.2f}s{audio_note}"
         )
         return "\n".join(parts)
 
@@ -98,7 +100,8 @@ class VoiceAssistant:
                  timeout: float = 30.0,
                  use_llm: bool = True,
                  verbose: bool = False,
-                 device: str | None = None):
+                 device: str | None = None,
+                 max_utterance_ms: int = 10000):
         self.model_name = model
         self.asr_device = asr_device
         self.compute_type = compute_type
@@ -111,6 +114,7 @@ class VoiceAssistant:
         self.language = language
         self.silence_end_ms = silence_end_ms
         self.timeout = timeout
+        self.max_utterance_ms = max_utterance_ms
         self.use_llm = use_llm
         self.verbose = verbose
 
@@ -278,7 +282,8 @@ class VoiceAssistant:
     def listen(self) -> np.ndarray:
         """等一句话，返回音频（16k float32）。超时返回空数组。"""
         return self.recorder.record_utterance(
-            timeout=self.timeout, silence_end_ms=self.silence_end_ms
+            timeout=self.timeout, silence_end_ms=self.silence_end_ms,
+            max_utterance_ms=self.max_utterance_ms,
         )
 
     def understand(self, text: str) -> tuple[object, bool]:
@@ -374,22 +379,25 @@ class VoiceAssistant:
         if audio.size == 0:
             return None
 
+        audio_s = audio.size / 16000.0
+
         t1 = time.time()
         try:
             asr_res = self.asr.transcribe(audio, language=self.language)
         except Exception as e:
             self.errors += 1
-            return TurnResult(error=f"ASR 失败：{e}")
+            return TurnResult(error=f"ASR 失败：{e}", audio_s=audio_s)
         t_asr = time.time() - t1
 
         text = (asr_res.text or "").strip()
         if not text:
             self.errors += 1
-            return TurnResult(error="ASR 返回空文本")
+            return TurnResult(error="ASR 返回空文本", audio_s=audio_s)
 
         r = self.handle_text(text)
         r.t_vad = t_vad
         r.t_asr = t_asr
+        r.audio_s = audio_s
         r.t_total += t_asr
         return r
 
