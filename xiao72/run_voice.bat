@@ -3,8 +3,10 @@ chcp 65001 >nul 2>&1
 title XIAO72 VOICE ASSISTANT
 rem ============================================================
 rem  Xiao72 voice assistant - one click launcher
-rem  No absolute paths: finds any venv automatically,
-rem  model dir comes from .env / X72_MODEL_DIR.
+rem  No absolute paths. Interpreter and model dir come from .env:
+rem    X72_PYTHON=<python.exe full path>   (optional)
+rem    X72_MODEL_DIR=<model cache dir>      (optional)
+rem  If absent, falls back to repo/.venv, ~/xiao72-venv, then py.
 rem ============================================================
 set PYTHONIOENCODING=utf-8
 set PYTHONUTF8=1
@@ -18,8 +20,17 @@ rem   To re-download models: open Clash, then run
 rem     set HTTPS_PROXY=http://127.0.0.1:7897
 cd /d "%~dp0"
 
-rem ---- find python: repo/.venv -> ~/xiao72-venv -> py launcher ----
-set "PY=%~dp0.venv\Scripts\python.exe"
+rem ---- read X72_PYTHON / X72_MODEL_DIR from .env (comments start with #) ----
+if exist "%~dp0.env" (
+  for /f "usebackq eol=# tokens=1,* delims==" %%a in ("%~dp0.env") do (
+    if /i "%%a"=="X72_PYTHON" set "X72_PYTHON=%%b"
+    if /i "%%a"=="X72_MODEL_DIR" set "X72_MODEL_DIR=%%b"
+  )
+)
+
+rem ---- find python: .env > repo/.venv > ~/xiao72-venv > py launcher ----
+set "PY=%X72_PYTHON%"
+if not defined PY set "PY=%~dp0.venv\Scripts\python.exe"
 if not exist "%PY%" set "PY=%USERPROFILE%\xiao72-venv\Scripts\python.exe"
 if not exist "%PY%" set "PY="
 if not defined PY (where py >nul 2>&1 && set "PY=py")
@@ -35,6 +46,6 @@ exit /b 0
 :nopy
 echo [ERROR] Python not found.
 echo   1. Install Python 3.10+ (check "Add to PATH")
-echo   2. Or set X72_PYTHON=<full path> in .env
+echo   2. Or add to .env:  X72_PYTHON=^<full path to python.exe^>
 pause
 exit /b 1
