@@ -30,7 +30,13 @@ import numpy as np
 
 from .base import AsrProvider, AsrResult
 
-DEFAULT_MODEL_DIR = os.environ.get("X72_MODEL_DIR", r"D:\AI_Cache\models")
+def _default_model_dir() -> str:
+    """模型目录：优先 LOCALAPPDATA，不写死盘符。"""
+    base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    return os.path.join(base, "xiao72", "models")
+
+
+DEFAULT_MODEL_DIR = os.environ.get("X72_MODEL_DIR") or _default_model_dir()
 
 # 领域提示词：告诉 Whisper "你接下来听到的基本都是这些词"。
 #
