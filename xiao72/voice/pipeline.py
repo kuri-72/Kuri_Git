@@ -36,6 +36,7 @@ if str(VOICE_DIR) not in sys.path:
 import numpy as np  # noqa: E402
 
 from trigger import AutoTrigger, Trigger  # noqa: E402
+from tts import TtsService  # noqa: E402
 from state import LedState  # noqa: E402
 from serial_link import SerialLink  # noqa: E402
 
@@ -134,6 +135,7 @@ class VoiceAssistant:
         self.rule = None
         self.state = LedState(0, 0)
         self.link = None
+        self.tts = None
 
         self.turns = 0
         self.ok = 0
@@ -281,6 +283,14 @@ class VoiceAssistant:
                 self.dry_run = True
                 print("      未找到设备 → DRY-RUN（只打印帧）")
 
+        # --- 语音播报 ---
+        try:
+            self.tts = TtsService()
+            print("\n[TTS] %s" % self.tts.cfg.describe())
+        except Exception as e:
+            self.tts = None
+            print("\n[TTS] 初始化失败（%s），将不播报" % type(e).__name__)
+
         print("\n" + "-" * 72)
         print("  准备好了。说完话停顿约 %.1f 秒自动识别。" % (self.silence_end_ms / 1000))
         print("  Ctrl+C 退出")
@@ -378,6 +388,12 @@ class VoiceAssistant:
         r.changed = changed
         r.t_act = time.time() - t1
         r.t_total = r.t_intent + r.t_act
+
+        # 语音播报：失败不影响对话，只是没声音
+        if self.tts is not None and r.say:
+            t2 = time.time()
+            self.tts.speak(r.say)
+            r.t_total += time.time() - t2
 
         if r.cmd == "unknown":
             self.unknown += 1
@@ -493,3 +509,9 @@ class VoiceAssistant:
             except Exception:
                 pass
             self.asr = None
+        if self.tts is not None:
+            try:
+                self.tts.close()
+            except Exception:
+                pass
+            self.tts = None

@@ -98,10 +98,15 @@ def main() -> int:
                          "避免长音频拖慢 ASR")
     ap.add_argument("--trigger", default="space", choices=["space", "auto"],
                     help="录音触发方式：space=按空格开始（默认）；auto=一直听（旧行为）")
+    ap.add_argument("--mute", action="store_true",
+                    help="关闭语音播报（TTS）；等价于 X72_TTS_MUTE=1")
     ap.add_argument("--timeout", type=float, default=30.0, help="单轮最长等待秒数")
     ap.add_argument("--no-llm", action="store_true", help="强制只用规则版（离线）")
     ap.add_argument("--verbose", action="store_true", help="打印 LLM 失败详情")
     args = ap.parse_args()
+
+    if args.mute:
+        os.environ["X72_TTS_MUTE"] = "1"
 
     compute = args.compute or ("float16" if args.device == "cuda" else "int8")
 
