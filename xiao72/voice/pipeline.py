@@ -28,8 +28,14 @@ HOST_DIR = Path(__file__).resolve().parent.parent / "host"
 if str(HOST_DIR) not in sys.path:
     sys.path.insert(0, str(HOST_DIR))
 
+# voice/ 里同样用扁平 import（from trigger import ...）
+VOICE_DIR = Path(__file__).resolve().parent
+if str(VOICE_DIR) not in sys.path:
+    sys.path.insert(0, str(VOICE_DIR))
+
 import numpy as np  # noqa: E402
 
+from trigger import AutoTrigger, Trigger  # noqa: E402
 from state import LedState  # noqa: E402
 from serial_link import SerialLink  # noqa: E402
 
@@ -101,7 +107,8 @@ class VoiceAssistant:
                  use_llm: bool = True,
                  verbose: bool = False,
                  device: str | None = None,
-                 max_utterance_ms: int = 10000):
+                 max_utterance_ms: int = 10000,
+                 trigger: Trigger | None = None):
         self.model_name = model
         self.asr_device = asr_device
         self.compute_type = compute_type
@@ -115,6 +122,9 @@ class VoiceAssistant:
         self.silence_end_ms = silence_end_ms
         self.timeout = timeout
         self.max_utterance_ms = max_utterance_ms
+        self.trigger: Trigger = trigger or AutoTrigger()
+        # 触发后等待语音的时长：由触发器决定（空格=8s，自动=timeout）
+        self.listen_timeout = float(self.trigger.timeout_hint)
         self.use_llm = use_llm
         self.verbose = verbose
 
@@ -282,7 +292,7 @@ class VoiceAssistant:
     def listen(self) -> np.ndarray:
         """等一句话，返回音频（16k float32）。超时返回空数组。"""
         return self.recorder.record_utterance(
-            timeout=self.timeout, silence_end_ms=self.silence_end_ms,
+            timeout=self.listen_timeout, silence_end_ms=self.silence_end_ms,
             max_utterance_ms=self.max_utterance_ms,
         )
 
@@ -416,11 +426,21 @@ class VoiceAssistant:
         try:
             while True:
                 print("\n" + "=" * 72)
-                print("  正在听……（最多等 %.0f 秒）" % self.timeout)
+                hint = self.trigger.describe()
+                if hint:
+                    print(hint)
+
+                if not self.trigger.wait():
+                    print("\n收到退出指令，结束。")
+                    break
+
+                if self.trigger.name != "auto":
+                    print("  正在听……（%.0f 秒内没听到就取消）" % self.listen_timeout)
+
                 r = self.handle_once()
 
                 if r is None:
-                    print("  没听到语音，继续听")
+                    print("  没听到语音，回到等待")
                     continue
 
                 self.turns += 1
