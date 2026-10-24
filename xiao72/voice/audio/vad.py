@@ -19,6 +19,7 @@
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import numpy as np
@@ -28,16 +29,33 @@ FRAME_SIZE = 512          # 16kHz 下 = 32ms
 SAMPLE_RATE = 16000
 
 
+def default_model_dir() -> Path:
+    """模型目录：优先 LOCALAPPDATA，不写死盘符。"""
+    base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    return Path(base) / "xiao72" / "models"
+
+
+def default_vad_model() -> Path:
+    """VAD 模型路径：X72_VAD_MODEL > X72_MODEL_DIR/silero_vad.onnx > 默认目录。"""
+    explicit = os.environ.get("X72_VAD_MODEL")
+    if explicit:
+        return Path(explicit)
+    model_dir = os.environ.get("X72_MODEL_DIR")
+    base = Path(model_dir) if model_dir else default_model_dir()
+    return base / "silero_vad.onnx"
+
+
 class SileroVad:
     """单帧人声概率评估器（有内部状态，必须按顺序喂帧）。"""
 
     def __init__(self, model_path: str | None = None, sr: int = SAMPLE_RATE):
-        path = Path(model_path or r"D:\AI_Cache\models\silero_vad.onnx")
+        path = Path(model_path) if model_path else default_vad_model()
         if not path.exists():
             raise FileNotFoundError(
                 f"找不到 VAD 模型：{path}\n"
                 "下载：https://github.com/snakers4/silero-vad/raw/master/"
-                "src/silero_vad/data/silero_vad.onnx"
+                "src/silero_vad/data/silero_vad.onnx\n"
+                "放到上面这个路径，或在 .env 里设 X72_VAD_MODEL=<完整路径>"
             )
         if sr not in (8000, 16000):
             raise ValueError("Silero VAD 只支持 8k 或 16k 采样率")
