@@ -3,6 +3,11 @@
   --line:#E5E5EA; --red:#FF3B30; --green:#248A3D; --green-soft:#34C759;
   --shadow:0 1px 2px rgba(0,0,0,.06),0 8px 24px rgba(0,0,0,.06);
   --spring:cubic-bezier(.34,1.56,.64,1);
+
+  /* ── 舞台尺寸：只改这三个数，画布/环/转圈会自动跟着变 ── */
+  --orb-w:260px;        /* 外框宽 */
+  --orb-h:150px;        /* 外框高（=宽 就是正圆） */
+  --orb-radius:50%;     /* 50% 椭圆 / 24px 圆角矩形 / 999px 胶囊 */
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;margin:0}
@@ -16,8 +21,9 @@ body{
 /* ---------------- 左侧舞台 ---------------- */
 .stage{flex:7;display:flex;flex-direction:column;min-width:0;padding:26px 30px}
 .orb-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;padding:10px 0 18px}
-.orb{position:relative;width:260px;height:150px;display:flex;align-items:center;justify-content:center;transition:transform .35s var(--spring)}
-.orb canvas{transition:opacity .3s ease,transform .35s var(--spring)}
+.orb{position:relative;width:var(--orb-w);height:var(--orb-h);display:flex;align-items:center;justify-content:center;transition:transform .35s var(--spring)}
+/* 画布只声明「占外框的百分之多少」，真实像素由 app.js 按这个尺寸算 */
+.orb canvas{width:74%;height:60%;transition:opacity .3s ease,transform .35s var(--spring)}
 .orb .spinner{
   position:absolute;width:58px;height:58px;border-radius:50%;
   opacity:0;transform:scale(.4);
@@ -36,7 +42,7 @@ body{
   animation:spin 1.15s linear infinite;
 }
 .orb .ring{
-  position:absolute;inset:0;border-radius:999px;
+  position:absolute;inset:0;border-radius:var(--orb-radius);
   border:2px dashed #C7C7CC;opacity:.9;
   transition:all .35s var(--spring);
 }

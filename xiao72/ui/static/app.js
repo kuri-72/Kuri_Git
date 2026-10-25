@@ -9,10 +9,25 @@
   let rafId = null;
   let typing = null;              // {finish()}
   let state = 'idle';
+  let W = 0, H = 0;               // 画布逻辑尺寸（由 CSS 决定，JS 只读取）
+
+  // 画布的像素尺寸跟着 CSS 走：改 --orb-w/--orb-h 不用动这里
+  function fitCanvas() {
+    const r = wave.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    W = Math.max(40, r.width);
+    H = Math.max(20, r.height);
+    wave.width = Math.round(W * dpr);
+    wave.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+  window.addEventListener('resize', fitCanvas);
 
   // ---------------- 波形（平滑曲线，不是柱条） ----------------
   function draw() {
-    const w = wave.width, h = wave.height, n = levels.length;
+    const w = W, h = H, n = levels.length;
+    if (!w || !h) return;
     const mid = h * 0.5, amp = h * 0.46;
     ctx.clearRect(0, 0, w, h);
     if (n < 2) return;
@@ -83,7 +98,7 @@
       pushLevel(0.02 + Math.random() * 0.02);
     }
   }, 90);
-  draw();
+  fitCanvas();
 
   // ---------------- 状态 ----------------
   const HINTS = {
