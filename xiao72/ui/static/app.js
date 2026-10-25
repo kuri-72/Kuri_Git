@@ -33,9 +33,9 @@
   //   → 绿（底）→ 灰（中）→ 红（顶）
   // delay 是各层相位错开量：0 / 2.1 / 4.2 ≈ 均分一个周期
   const PEAKS = [
-    { c: 0.75, k: 0.30, rgb: cssVar('--c-green-rgb'),  fill: 0.08, line: 0.85, delay: 0.0 },  // 绿（最底层）
-    { c: 0.25, k: 0.30, rgb: cssVar('--c-gray-rgb'),   fill: 0.10, line: 0.80, delay: 2.1 },  // 灰（中层）
-    { c: 0.50, k: 1.00, rgb: cssVar('--c-accent-rgb'), fill: 0.12, line: 0.95, delay: 4.2 },  // 红（最顶层）
+    { c: 0.75, k: 0.30, rgb: cssVar('--c-green'),  fill: 0.08, line: 0.85, delay: 0.0 },  // 绿（最底层）
+    { c: 0.25, k: 0.30, rgb: cssVar('--c-gray'),   fill: 0.10, line: 0.80, delay: 2.1 },  // 灰（中层）
+    { c: 0.50, k: 1.00, rgb: cssVar('--c-accent'), fill: 0.12, line: 0.95, delay: 4.2 },  // 红（最顶层）
   ];
   const SIGMA = 0.11;             // 峰的胖瘦（相对画布宽）
   const PAD_X = 0, PAD_Y = 14;    // 横向不留白：波形宽度 = 胶囊宽度
