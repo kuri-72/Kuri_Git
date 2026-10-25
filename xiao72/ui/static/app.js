@@ -26,16 +26,24 @@
   window.addEventListener('resize', fitCanvas);
 
   // 三层：主线红，左灰，右绿；各自独立，不叠加成一条
-  // 颜色全部来自 theme.css，这里只取 RGB 分量（canvas 需要 rgba）
-  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  // 颜色来自 theme.css。canvas 要 "r,g,b" 分量，借隐藏元素让浏览器把
+  // 任意 CSS 颜色（hex / color-mix）解析成 rgb() 再取数字。
+  const probe = document.createElement('span');
+  probe.style.cssText = 'position:absolute;left:-9999px;top:0;';
+  document.body.appendChild(probe);
+  const toRGB = (name) => {
+    probe.style.color = `var(${name})`;
+    const m = getComputedStyle(probe).color.match(/\d+/g);
+    return m ? `${m[0]},${m[1]},${m[2]}` : '255,255,255';
+  };
 
   // 数组顺序 = 绘制顺序：先画的在底层，后画的在顶层
   //   → 绿（底）→ 灰（中）→ 红（顶）
   // delay 是各层相位错开量：0 / 2.1 / 4.2 ≈ 均分一个周期
   const PEAKS = [
-    { c: 0.75, k: 0.30, rgb: cssVar('--c-green'),  fill: 0.08, line: 0.85, delay: 0.0 },  // 绿（最底层）
-    { c: 0.25, k: 0.30, rgb: cssVar('--c-gray'),   fill: 0.10, line: 0.80, delay: 2.1 },  // 灰（中层）
-    { c: 0.50, k: 1.00, rgb: cssVar('--c-accent'), fill: 0.12, line: 0.95, delay: 4.2 },  // 红（最顶层）
+    { c: 0.75, k: 0.30, rgb: toRGB('--c-green'),  fill: 0.08, line: 0.85, delay: 0.0 },  // 绿（最底层）
+    { c: 0.25, k: 0.30, rgb: toRGB('--c-gray'),   fill: 0.10, line: 0.80, delay: 2.1 },  // 灰（中层）
+    { c: 0.50, k: 1.00, rgb: toRGB('--c-accent'), fill: 0.12, line: 0.95, delay: 4.2 },  // 红（最顶层）
   ];
   const SIGMA = 0.11;             // 峰的胖瘦（相对画布宽）
   const PAD_X = 0, PAD_Y = 14;    // 横向不留白：波形宽度 = 胶囊宽度

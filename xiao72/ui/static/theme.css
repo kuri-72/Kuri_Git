@@ -1,63 +1,65 @@
 /* ============================================================
-   小72 · 主题色板
+   小72 · 主题
    ------------------------------------------------------------
-   换主题只改本文件。style.css 里不再出现任何颜色字面量，
-   app.js 里的波形颜色也从这里读。
+   ★ 换主题：只改「① 基础色」这 7 行。
+     下面 ② 全部由它们自动派生，不需要动。
 
-   层级约定：
-     ① 底 / 面        —— 决定整体明暗
-     ② 字 / 线        —— 决定可读性
-     ③ 强调 / 语义    —— 红=主强调，绿/灰=波形辅峰
-     ④ 阴影 / 遮罩    —— 由 ① 派生
+   派生规则（方便预判）：
+     · 表面明暗 = 基础表面色 与 黑/白 混合
+     · 描边     = 主文字色 稀释成半透明
+     · 强调深浅 = 主强调色 与 黑/白 混合
+     · 透明度   = 主强调色 混 transparent
    ============================================================ */
 
 :root{
 
-  /* ── ① 底色与表面 ───────────────────────────────────── */
-  --c-bg:             #0B0B0D;   /* 窗口底 */
-  --c-surface:        #17171A;   /* 卡片、对话气泡 */
-  --c-surface-sunken: #101012;   /* 右侧栏、下拉框（比卡片更暗） */
-  --c-surface-hover:  #1F1F23;   /* 鼠标悬停 */
-  --c-surface-raise:  #242428;   /* 悬浮小按钮（关闭 ×） */
-  --c-track:          #000000;   /* 进度条 / 滑块的凹槽 */
+  /* ── ① 基础色（只改这里） ─────────────────────────────── */
+  --c-bg:       #0B0B0D;   /* 窗口底色（近黑） */
+  --c-surface:  #17171A;   /* 卡片、对话气泡（深灰） */
+  --c-ink:      #F2F2F7;   /* 主文字 */
+  --c-ink-sub:  #8E8E93;   /* 次要文字、标签 */
+  --c-accent:   #FF453A;   /* ★ 主强调色：红 */
+  --c-green:    #30D158;   /* 波形右辅峰：绿 */
+  --c-gray:     #8E8E93;   /* 波形左辅峰：灰 */
 
-  /* ── ② 文字与描边 ───────────────────────────────────── */
-  --c-ink:         #F2F2F7;      /* 主文字 */
-  --c-ink-sub:     #8E8E93;      /* 次要文字、标签、数值单位 */
-  --c-line:        #2A2A2E;      /* 分隔线、卡片描边 */
-  --c-line-strong: #3A3A3E;      /* 胶囊虚线框、滚动条 */
+  /* ── ② 自动派生（不用改） ─────────────────────────────── */
 
-  /* ── ③ 强调色 ───────────────────────────────────────── */
-  /* 全部以 RGB 分量形式定义（"R,G,B"），用法：
+  /* 表面：同一底色往暗/往亮走 */
+  --c-surface-sunken: color-mix(in srgb, var(--c-surface) 55%, black);
+  --c-surface-hover:  color-mix(in srgb, var(--c-surface) 82%, white);
+  --c-surface-raise:  color-mix(in srgb, var(--c-surface) 70%, white);
+  --c-track:          color-mix(in srgb, var(--c-bg) 45%, black);
 
-       rgb(var(--c-accent))            → 实色
-       rgba(var(--c-accent), .12)      → 带透明度
+  /* 描边：主文字色稀释 */
+  --c-line:        color-mix(in srgb, var(--c-ink) 12%, transparent);
+  --c-line-strong: color-mix(in srgb, var(--c-ink) 22%, transparent);
 
-     这样同一个颜色只写一次，改一处整站生效。 */
+  /* 强调色的深浅两档 */
+  --c-accent-deep:  color-mix(in srgb, var(--c-accent) 72%, black);
+  --c-accent-hover: color-mix(in srgb, var(--c-accent) 85%, white);
 
-  /* 红：主强调。按钮、进度条、灯条、当前说话人、警示全部用它 */
-  --c-accent:        255,69,58;
-  --c-accent-deep:   195,53,44;    /* 渐变起点、滑块描边 */
-  --c-accent-hover:  255,91,81;    /* 悬停 */
-  --c-on-accent:     #FFFFFF;      /* 红底上的文字（唯一需要实色的例外） */
+  /* 强调色的透明度阶梯 */
+  --c-accent-a06: color-mix(in srgb, var(--c-accent)  6%, transparent);
+  --c-accent-a10: color-mix(in srgb, var(--c-accent) 10%, transparent);
+  --c-accent-a28: color-mix(in srgb, var(--c-accent) 28%, transparent);
+  --c-accent-a35: color-mix(in srgb, var(--c-accent) 35%, transparent);
+  --c-accent-a45: color-mix(in srgb, var(--c-accent) 45%, transparent);
+  --c-accent-a94: color-mix(in srgb, var(--c-accent) 94%, transparent);
 
-  /* 绿：只用于波形右辅峰（UI 里不再出现绿色） */
-  --c-green:        48,209,88;
+  /* 红底上的文字（唯一固定的实色） */
+  --c-on-accent: #FFFFFF;
 
-  /* 灰：波形左辅峰 */
-  --c-gray:         142,142,147;
-
-  /* ── ④ 阴影与遮罩 ───────────────────────────────────── */
+  /* 阴影与遮罩 */
   --c-shadow:        0 1px 2px rgba(0,0,0,.60), 0 12px 32px rgba(0,0,0,.45);
   --c-shadow-drawer: -8px 0 40px rgba(0,0,0,.60);
-  --c-shadow-accent: 0 8px 24px rgba(255,69,58,.30);   /* 红色提示条的投影 */
+  --c-shadow-accent: 0 8px 24px var(--c-accent-a35);
   --c-scrim:         rgba(0,0,0,.55);
 
-  /* ── 动效曲线 ───────────────────────────────────────── */
+  /* ── 动效曲线 ─────────────────────────────────────────── */
   --spring: cubic-bezier(.34,1.56,.64,1);
 
-  /* ── 舞台尺寸（与配色无关，放这里方便一起改） ───────── */
+  /* ── 舞台尺寸（与配色无关） ───────────────────────────── */
   --orb-w: 260px;        /* 胶囊宽 */
   --orb-h: 150px;        /* 胶囊高（=宽 即正圆） */
-  --orb-radius: 999px;   /* 999px 胶囊 / 50% 椭圆 / 24px 圆角矩形 */
+  --orb-radius: 999px;   /* 999px 胶囊 / 50% 椭圆 / 24px 圆角 */
 }
