@@ -12,11 +12,12 @@
   let W = 0, H = 0;               // 画布逻辑尺寸（由 CSS 决定，JS 只读取）
 
   // 画布的像素尺寸跟着 CSS 走：改 --orb-w/--orb-h 不用动这里
+  // 注意：必须用 clientWidth（布局尺寸），不能用 getBoundingClientRect
+  //       ——后者会把 transform 缩放算进去，画布跟着环缩放时会二次缩放
   function fitCanvas() {
-    const r = wave.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    W = Math.max(40, r.width);
-    H = Math.max(20, r.height);
+    W = Math.max(40, wave.clientWidth || wave.offsetWidth);
+    H = Math.max(20, wave.clientHeight || wave.offsetHeight);
     wave.width = Math.round(W * dpr);
     wave.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

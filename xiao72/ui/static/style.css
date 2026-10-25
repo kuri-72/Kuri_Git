@@ -56,10 +56,12 @@ body{
 
 /* 状态：等待按住 */
 .orb.waiting .ring{transform:scale(.92);opacity:.55;animation:breathe 2.4s ease-in-out infinite}
+.orb.waiting canvas{transform:scale(.92)}          /* 画布与环同步缩放 */
 @keyframes breathe{0%,100%{opacity:.35}50%{opacity:.75}}
 
 /* 状态：录音中 */
 .orb.recording .ring{border:2px solid var(--red);opacity:1;transform:scale(1);box-shadow:0 0 0 6px rgba(255,69,58,.10)}
+.orb.recording canvas{transform:scale(1)}
 
 /* 状态：识别中 */
 .orb.thinking canvas{opacity:0;transform:scale(.3)}
@@ -72,6 +74,7 @@ body{
 
 /* 状态：取消 */
 .orb.cancelled .ring{border-color:var(--red);transform:scale(.9)}
+.orb.cancelled canvas{transform:scale(.9)}
 
 /* 处理中按空格的抖动 */
 .orb.shake{animation:shake .4s cubic-bezier(.36,.07,.19,.97)}
