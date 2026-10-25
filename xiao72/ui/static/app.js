@@ -24,21 +24,18 @@
   }
   window.addEventListener('resize', fitCanvas);
 
-  // ---------------- 波形：三个高斯峰的叠加 ----------------
-  //   中心   1.0 倍
-  //   1/4、3/4 各 0.3 倍，和主峰重叠
-  // 形状固定不动，只随音量整体上下起伏（像正态分布被"撑起来"）
-  const PEAKS = [[0.5, 1.0], [0.25, 0.3], [0.75, 0.3]];
+  // ---------------- 波形：三个高斯峰，各自成层叠加 ----------------
+  //   中心     1.0 倍
+  //   1/4、3/4  各 0.3 倍
+  // 三层互不相加，各自画一条带子，重叠处自然加深
+  const PEAKS = [
+    { c: 0.50, k: 1.0, fill: 0.13, line: 0.85 },   // 主峰
+    { c: 0.25, k: 0.3, fill: 0.10, line: 0.50 },   // 左副峰
+    { c: 0.75, k: 0.3, fill: 0.10, line: 0.50 },   // 右副峰
+  ];
   const SIGMA = 0.11;             // 峰的胖瘦（相对画布宽）
 
-  function bell(xn) {             // xn: 0..1 归一化横坐标
-    let sum = 0;
-    for (const [c, k] of PEAKS) {
-      const d = xn - c;
-      sum += k * Math.exp(-(d * d) / (2 * SIGMA * SIGMA));
-    }
-    return sum;
-  }
+  const rgb = (a) => (state === 'recording' ? `rgba(36,138,61,${a})` : `rgba(199,199,204,${a})`);
 
   function draw() {
     const w = W, h = H;
@@ -47,19 +44,8 @@
     ctx.clearRect(0, 0, w, h);
 
     const s = Math.pow(Math.max(0, Math.min(1, level)), 0.55);   // 感知压缩
-    const active = state === 'recording';
-    const col = active ? '#248A3D' : '#C7C7CC';
 
     const N = 96;
-    const top = [], bot = [];
-    for (let i = 0; i <= N; i++) {
-      const xn = i / N;
-      const y = bell(xn) * s * amp;
-      const x = xn * w;
-      top.push([x, mid - y]);
-      bot.push([x, mid + y * 0.42]);      // 上下不对称：下沿短
-    }
-
     const path = (pts, reverse) => {
       const p = reverse ? pts.slice().reverse() : pts;
       ctx.moveTo(p[0][0], p[0][1]);
@@ -71,23 +57,31 @@
       ctx.lineTo(p[p.length - 1][0], p[p.length - 1][1]);
     };
 
-    // 上下两条曲线围成的带子
-    ctx.beginPath();
-    path(top, false);
-    path(bot, true);
-    ctx.closePath();
-    const g = ctx.createLinearGradient(0, mid - amp, 0, mid + amp);
-    g.addColorStop(0, active ? 'rgba(36,138,61,.20)' : 'rgba(199,199,204,.22)');
-    g.addColorStop(0.5, active ? 'rgba(36,138,61,.10)' : 'rgba(199,199,204,.10)');
-    g.addColorStop(1, active ? 'rgba(36,138,61,.20)' : 'rgba(199,199,204,.22)');
-    ctx.fillStyle = g;
-    ctx.fill();
+    // 逐个峰独立绘制：先填带子，再描上下两条边
+    for (const p of PEAKS) {
+      const top = [], bot = [];
+      for (let i = 0; i <= N; i++) {
+        const xn = i / N;
+        const d = xn - p.c;
+        const y = p.k * Math.exp(-(d * d) / (2 * SIGMA * SIGMA)) * s * amp;
+        const x = xn * w;
+        top.push([x, mid - y]);
+        bot.push([x, mid + y * 0.42]);       // 上下不对称：下沿短
+      }
 
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = col;
-    ctx.beginPath(); path(top, false); ctx.stroke();
-    ctx.beginPath(); path(bot, false); ctx.stroke();
+      ctx.beginPath();
+      path(top, false);
+      path(bot, true);
+      ctx.closePath();
+      ctx.fillStyle = rgb(p.fill);
+      ctx.fill();
+
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = rgb(p.line);
+      ctx.beginPath(); path(top, false); ctx.stroke();
+      ctx.beginPath(); path(bot, false); ctx.stroke();
+    }
   }
 
   function pushLevel(v) {
