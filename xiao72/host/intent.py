@@ -153,6 +153,69 @@ def normalize(obj: dict[str, Any]) -> Intent:
                   say=say, raw="", repaired=repaired)
 
 
+# ---------------------------------------------------------------- 工具定义
+#
+# tool calling 的 schema：模型自己决定「调工具」还是「直接说话」。
+# 好处：一次往返完成路由；聊天是纯文本，不再被 JSON 的 say 字段限制长度。
+
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "set_led",
+            "description": (
+                "调整这盏灯的亮度和/或呼吸效果。"
+                "用户明确要求调亮、调暗、设定百分比、开呼吸模式时调用。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "brightness": {
+                        "type": "integer", "minimum": 0, "maximum": 100,
+                        "description": "目标亮度百分比。关灯不要用这个，用 turn_off",
+                    },
+                    "period_ms": {
+                        "type": "integer", "minimum": 0, "maximum": 9990,
+                        "description": "呼吸周期毫秒；0 表示常亮（不呼吸）",
+                    },
+                },
+                "required": ["brightness"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "turn_off",
+            "description": "关灯。用户说关灯、关掉、别亮了、要睡觉时调用。",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+]
+
+
+@dataclass
+class Reply:
+    """一次交互的结果：要么是设备意图，要么是一句话。"""
+
+    intent: "Intent | None" = None
+    text: str = ""
+
+    @property
+    def is_command(self) -> bool:
+        return self.intent is not None
+
+
+def _tool_confirmation(cmd: str, brightness, period_ms) -> str:
+    """执行回执。**本地生成**，保证措辞一致、长度可控（要念出来）。"""
+    if cmd == "off":
+        return "已关灯"
+    if cmd == "breath":
+        secs = (period_ms or 2000) / 1000.0
+        return "已调到 %d%%，呼吸 %.1f 秒" % (brightness or 0, secs)
+    return "已调到 %d%%" % (brightness or 0)
+
+
 # ---------------------------------------------------------------- LLM 客户端
 
 class IntentParser:
@@ -191,11 +254,11 @@ class IntentParser:
         )
         return self._client
 
-    def parse(self, user_text: str, context: str | None = None) -> Intent:
+    def route(self, user_text: str, context: str | None = None) -> Reply:
+        """一次调用完成路由：调工具 = 命令；直接回话 = 聊天。"""
         user_text = (user_text or "").strip()
         if not user_text:
-            return Intent(cmd="unknown", brightness=None, period_ms=None,
-                          say="你还没说话")
+            return Reply(text="你还没说话")
 
         client = self._ensure_client()
         messages: list[dict[str, str]] = [{"role": "system", "content": self.system_prompt}]
@@ -210,25 +273,65 @@ class IntentParser:
                 model=self.cfg.model,
                 messages=messages,  # type: ignore[arg-type]
                 temperature=self.cfg.temperature,
-                max_tokens=200,
+                max_tokens=500,
+                tools=TOOLS,          # type: ignore[arg-type]
+                tool_choice="auto",
             )
         except Exception as e:  # 网络/鉴权/限流，统一包一层
             raise IntentError(f"调用模型失败：{type(e).__name__}: {e}") from e
 
-        content = (resp.choices[0].message.content or "").strip()
-        obj = extract_json(content)
-        if obj is None:
-            raise IntentError(
-                "模型输出里找不到 JSON，原文如下（可把这段发我，我改 prompt）：\n"
-                f"{content[:500]}"
-            )
+        msg = resp.choices[0].message
+        calls = getattr(msg, "tool_calls", None)
 
-        intent = normalize(obj)
-        intent.raw = content
-        if self.keep_history:
+        if calls:
+            try:
+                fn = calls[0].function
+                args = json.loads(fn.arguments or "{}")
+                intent = self._intent_from_tool(fn.name, args)
+            except Exception as e:
+                raise IntentError(f"工具参数解析失败：{type(e).__name__}: {e}") from e
+            if self.keep_history:
+                self._history.append({"role": "user", "content": user_text})
+                self._history.append({"role": "assistant",
+                                      "content": intent.say})
+            return Reply(intent=intent)
+
+        text = (msg.content or "").strip()
+        if self.keep_history and text:
             self._history.append({"role": "user", "content": user_text})
-            self._history.append({"role": "assistant", "content": json.dumps(intent.as_dict(), ensure_ascii=False)})
-        return intent
+            self._history.append({"role": "assistant", "content": text})
+        return Reply(text=text or "嗯，我在听")
+
+    def _intent_from_tool(self, name: str, args: dict[str, Any]) -> Intent:
+        """把工具调用参数翻成 Intent，并做限幅（和旧 normalize 同一套规则）。"""
+        if name == "turn_off":
+            return Intent(cmd="off", brightness=0, period_ms=0, say="已关灯")
+
+        repaired: list[str] = []
+        b, fixed_b = _clamp(args.get("brightness", 50), 0, 100, 50)
+        if fixed_b:
+            repaired.append(f"brightness 限幅 → {b}")
+
+        period, fixed_p = _clamp(args.get("period_ms", 0), 0, 9999, 0)
+        if period > 0:
+            period = max(50, min(9990, period))
+            period = int(round(period / 10.0) * 10)
+            if fixed_p:
+                repaired.append(f"period_ms 限幅 → {period}")
+            return Intent(cmd="breath", brightness=b, period_ms=period,
+                          say=_tool_confirmation("breath", b, period),
+                          repaired=repaired)
+
+        return Intent(cmd="set_led", brightness=b, period_ms=0,
+                      say=_tool_confirmation("set_led", b, 0),
+                      repaired=repaired)
+
+    def parse(self, user_text: str, context: str | None = None) -> Intent:
+        """兼容旧接口：聊天结果包装成 cmd=chat 的 Intent。"""
+        r = self.route(user_text, context=context)
+        if r.intent is not None:
+            return r.intent
+        return Intent(cmd="chat", say=r.text)
 
 
 class MockParser:

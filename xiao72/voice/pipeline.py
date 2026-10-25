@@ -311,14 +311,18 @@ class VoiceAssistant:
         st = self.state
         return "亮度 %d%%，周期 %dms" % (st.brightness, st.period_ms)
 
-    def understand(self, text: str) -> tuple[object, bool]:
-        """文字 → 意图。返回 (Intent, 是否降级)。
+    def route_text(self, text: str):
+        """文字 → (intent | None, 聊天文本, 是否降级)。
 
-        先试 LLM；失败自动退回规则版。
+        LLM 走 tool calling：调工具就是命令，直接回话就是聊天。
+        LLM 失败时退回规则版（只能识别命令，聊天退化成"没听懂"）。
         """
         if self.llm is not None:
             try:
-                return self.llm.parse(text, context=self._context()), False
+                rep = self.llm.route(text, context=self._context())
+                if rep.intent is not None:
+                    return rep.intent, "", False
+                return None, rep.text, False
             except IntentError as e:
                 if self.verbose:
                     print(f"      [LLM 失败] {str(e)[:80]}")
@@ -327,9 +331,19 @@ class VoiceAssistant:
                     print(f"      [LLM 异常] {type(e).__name__}")
 
         if self.rule is not None:
-            return self.rule.parse(text), True
+            it = self.rule.parse(text)
+            if getattr(it, "cmd", "unknown") == "unknown":
+                return None, (getattr(it, "say", "") or "没听懂"), True
+            return it, "", True
 
         raise RuntimeError("没有可用的意图识别后端")
+
+    def understand(self, text: str) -> tuple[object, bool]:
+        """兼容旧接口：返回 (Intent, 是否降级)，聊天包装成 cmd=chat。"""
+        intent, chat_text, degraded = self.route_text(text)
+        if intent is not None:
+            return intent, degraded
+        return Intent(cmd="chat", say=chat_text), degraded
 
     def act(self, intent) -> tuple[str, list[str]]:
         """意图 → 帧 → 下发。返回 (帧, 变化字段)。"""
@@ -364,7 +378,7 @@ class VoiceAssistant:
 
         t0 = time.time()
         try:
-            intent, degraded = self.understand(text)
+            intent, chat_text, degraded = self.route_text(text)
         except Exception as e:
             r.error = f"意图识别失败：{e}"
             self.errors += 1
@@ -373,6 +387,18 @@ class VoiceAssistant:
         r.degraded = degraded
         if degraded:
             self.degraded_count += 1
+
+        # ---- 纯粹聊天：不碰硬件，只说一句话 ----
+        if intent is None:
+            r.cmd = "chat"
+            r.say = chat_text
+            r.t_total = r.t_intent
+            if self.tts is not None and r.say:
+                t2 = time.time()
+                self.tts.speak(r.say)
+                r.t_total += time.time() - t2
+            self.ok += 1
+            return r
 
         r.cmd = getattr(intent, "cmd", "unknown")
         r.say = getattr(intent, "say", "") or ""
