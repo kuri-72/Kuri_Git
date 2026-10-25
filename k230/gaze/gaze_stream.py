@@ -177,12 +177,18 @@ def main():
     led = Led()
     led.green()                      # 待机：绿灯常亮
 
+    # 用户按键 GPIO53：下拉输入，按下为高电平。每按一次在日志里打一个标记
+    btn = Pin(53, Pin.IN, pull=Pin.PULL_DOWN)
+    btn_last = 0
+    btn_ts = 0
+    mark = 0
+
     face_det_kmodel_path = "/sdcard/examples/kmodel/face_detection_320.kmodel"
     eye_gaze_kmodel_path = "/sdcard/examples/kmodel/eye_gaze.kmodel"
     anchors_path = "/sdcard/examples/utils/prior_data_320.bin"
     log_path = "/sdcard/gaze_log.csv"
 
-    rgb888p_size = [800, 480]
+    rgb888p_size = [640, 360]
     face_det_input_size = [320, 320]
     eye_gaze_input_size = [448, 448]
     confidence_threshold = 0.5
@@ -194,7 +200,7 @@ def main():
     anchors = anchors.reshape((anchor_len, det_dim))
 
     pl = PipeLine(rgb888p_size=rgb888p_size, display_mode="virt",
-                  display_size=[800, 480])
+                  display_size=rgb888p_size)
     pl.create()
 
     eg = EyeGaze(face_det_kmodel_path, eye_gaze_kmodel_path,
@@ -205,7 +211,8 @@ def main():
                  nms_threshold=nms_threshold,
                  rgb888p_size=rgb888p_size)
 
-    print("# 开始采集，按顺序做动作：看镜头 / 看屏幕 / 看左 / 看右 / 低头")
+    print("# 每做一个动作【前】按一下板上的用户按键，日志会打 #MARK")
+    print("# 顺序：看镜头 / 看屏幕正中 / 看左 / 看右 / 低头看键盘，每个 5 秒")
     print("# 格式: G,pitch,yaw,face,ts_ms")
 
     f = open(log_path, "w")
@@ -214,12 +221,24 @@ def main():
     frame = 0
     buf = []
     t0 = time.ticks_ms()
+    fps_t0 = t0
+    fps_n = 0
 
     try:
         while True:
             img = pl.get_frame()
             nface, pitch, yaw, valid = eg.run(img)
             ts = time.ticks_ms() - t0
+
+            # ---- 按键打点（300ms 防抖）----
+            v = btn.value()
+            if v and not btn_last and (ts - btn_ts) > 300:
+                mark += 1
+                btn_ts = ts
+                f.write("#MARK %d,%d\n" % (mark, ts))
+                f.flush()
+                print("#MARK %d @%d" % (mark, ts))
+            btn_last = v
 
             line = "G,%.4f,%.4f,%d,%d" % (pitch, yaw, valid, ts)
             if frame % 5 == 0:
@@ -231,6 +250,14 @@ def main():
                 buf = []
 
             frame += 1
+            fps_n += 1
+            if fps_n >= 50:
+                dt = time.ticks_ms() - fps_t0
+                if dt > 0:
+                    print("# fps %.1f" % (fps_n * 1000.0 / dt))
+                fps_t0 = time.ticks_ms()
+                fps_n = 0
+
             if frame % 25 == 0:
                 gc.collect()
 
