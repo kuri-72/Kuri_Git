@@ -20,6 +20,10 @@ def create_app(bus, runtime) -> Flask:
     app = Flask(__name__, static_folder="static", static_url_path="/static")
     app.config["JSON_AS_ASCII"] = False
 
+    # 静态资源请求太吵，只保留警告
+    import logging
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
+
     @app.get("/")
     def index():
         return send_from_directory(app.static_folder, "index.html")

@@ -199,8 +199,11 @@ def main() -> int:
         "小72", url, width=1200, height=760, min_size=(900, 600),
         background_color="#F2F2F7",
     )
+    print("[UI] 窗口已创建，进入事件循环…", flush=True)
     webview.start()
-    return 0
+    print("[UI] 窗口关闭", flush=True)
+    # pywebview 在 Windows 上关闭窗口后可能返回非 0 退出码，这里统一成 0
+    os._exit(0)
 
 
 if __name__ == "__main__":
