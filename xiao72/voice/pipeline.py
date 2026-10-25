@@ -136,6 +136,7 @@ class VoiceAssistant:
         self.state = LedState(0, 0)
         self.link = None
         self.tts = None
+        self.runtime = None          # UI 版会注入；无 UI 时保持 None
 
         self.turns = 0
         self.ok = 0
@@ -299,11 +300,46 @@ class VoiceAssistant:
     # ================================================================
     #  单轮
     # ================================================================
+    def _state(self, v: str) -> None:
+        """给 UI 报状态；没有 UI 时什么都不做。"""
+        rt = getattr(self, "runtime", None)
+        if rt is not None:
+            try:
+                rt.set_state(v)
+            except Exception:
+                pass
+
+    def _emit(self, event: dict) -> None:
+        rt = getattr(self, "runtime", None)
+        if rt is not None:
+            try:
+                rt.emit(event)
+            except Exception:
+                pass
+
+    def _on_level(self, rms: float) -> None:
+        rt = getattr(self, "runtime", None)
+        if rt is not None:
+            try:
+                rt.emit({"t": "level", "v": round(min(1.0, rms * 6.0), 3)})
+            except Exception:
+                pass
+
+    def _cancelled(self) -> bool:
+        rt = getattr(self, "runtime", None)
+        return bool(rt is not None and rt.cancel_flag.is_set())
+
     def listen(self) -> np.ndarray:
         """等一句话，返回音频（16k float32）。超时返回空数组。"""
+        held = getattr(self.trigger, "held", None)
         return self.recorder.record_utterance(
-            timeout=self.listen_timeout, silence_end_ms=self.silence_end_ms,
+            timeout=self.listen_timeout,
+            silence_end_ms=self.silence_end_ms,
             max_utterance_ms=self.max_utterance_ms,
+            stop_when=held,
+            tail_ms=250,
+            no_speech_ms=5000,
+            on_level=self._on_level,
         )
 
     def _context(self) -> str:
@@ -393,12 +429,8 @@ class VoiceAssistant:
             r.cmd = "chat"
             r.say = chat_text
             r.t_total = r.t_intent
-            if self.tts is not None and r.say:
-                t2 = time.time()
-                self.tts.speak(r.say)
-                r.t_total += time.time() - t2
             self.ok += 1
-            return r
+            return self._finish(r)
 
         r.cmd = getattr(intent, "cmd", "unknown")
         r.say = getattr(intent, "say", "") or ""
@@ -415,40 +447,80 @@ class VoiceAssistant:
         r.t_act = time.time() - t1
         r.t_total = r.t_intent + r.t_act
 
-        # 语音播报：失败不影响对话，只是没声音
-        if self.tts is not None and r.say:
-            t2 = time.time()
-            self.tts.speak(r.say)
-            r.t_total += time.time() - t2
-
         if r.cmd == "unknown":
             self.unknown += 1
         else:
             self.ok += 1
+        return self._finish(r)
+
+    def _finish(self, r: TurnResult) -> TurnResult:
+        """播报 + 上报 UI。
+
+        **文字在播报之前就发出去**：这样用户打断播报时，全文已经在屏幕上，
+        不需要等声音放完才知道说了什么。
+        """
+        self._emit({"t": "reply", "text": r.say, "cmd": r.cmd})
+        self._emit({"t": "metrics",
+                    "asr": round(r.t_asr, 2), "intent": round(r.t_intent, 2),
+                    "act": round(r.t_act, 2), "total": round(r.t_total, 2),
+                    "audio_s": round(r.audio_s, 1)})
+
+        if self.tts is not None and r.say:
+            rt = getattr(self, "runtime", None)
+            stop_ev = None
+            if rt is not None:
+                stop_ev = rt.interrupt_flag
+                stop_ev.clear()
+            self._state("speaking")
+            t2 = time.time()
+            self.tts.speak(r.say, stop_event=stop_ev)
+            r.t_total += time.time() - t2
+
+        self._state("idle")
+        self._emit({"t": "stats", "turns": self.turns, "ok": self.ok,
+                    "unknown": self.unknown, "errors": self.errors,
+                    "degraded": self.degraded_count})
         return r
 
     def handle_once(self) -> TurnResult | None:
         """听一句 → 处理。没听到语音返回 None。"""
+        self._state("recording")
         t0 = time.time()
         audio = self.listen()
         t_vad = time.time() - t0
 
+        if self._cancelled():
+            self._state("idle")
+            return None
+
         if audio.size == 0:
+            self._state("idle")
             return None
 
         audio_s = audio.size / 16000.0
+        self._state("thinking")
 
         t1 = time.time()
         try:
             asr_res = self.asr.transcribe(audio, language=self.language)
         except Exception as e:
             self.errors += 1
+            self._state("idle")
             return TurnResult(error=f"ASR 失败：{e}", audio_s=audio_s)
         t_asr = time.time() - t1
 
         text = (asr_res.text or "").strip()
+        self._emit({"t": "asr", "text": text, "secs": round(t_asr, 2),
+                    "audio_s": round(audio_s, 2)})
+
+        # ASR 期间按了 Esc：不发 API，直接丢弃
+        if self._cancelled():
+            self._state("cancelled")
+            return TurnResult(text=text, error="已取消", audio_s=audio_s)
+
         if not text:
             self.errors += 1
+            self._state("idle")
             return TurnResult(error="ASR 返回空文本", audio_s=audio_s)
 
         r = self.handle_text(text)

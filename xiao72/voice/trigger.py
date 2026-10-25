@@ -12,6 +12,20 @@
 from __future__ import annotations
 
 import sys
+import time
+
+VK_SPACE = 0x20
+VK_Q = 0x51
+VK_ESC = 0x1B
+
+
+def _key_down(vk: int) -> bool:
+    """Windows：查询某个键当前是否被按住（能拿到 key-up，msvcrt 做不到）。"""
+    try:
+        import ctypes
+        return bool(ctypes.windll.user32.GetAsyncKeyState(vk) & 0x8000)
+    except Exception:
+        return False
 
 
 class Trigger:
@@ -81,9 +95,47 @@ class SpaceTrigger(Trigger):
         return s.strip().lower() not in ("q", "quit", "exit")
 
 
+class PushToTalkTrigger(Trigger):
+    """按住空格说话：按下开始、松开结束。
+
+    UI 版用这个。用 GetAsyncKeyState 轮询，才能拿到「松开」这个事件。
+    """
+
+    name = "hold"
+    timeout_hint = 30.0        # 按住后最长录多久（由 max_utterance 再兜一层）
+    poll = 0.02
+
+    def __init__(self, on_press=None):
+        self._on_press = on_press
+
+    def held(self) -> bool:
+        return _key_down(VK_SPACE)
+
+    def wait(self) -> bool:
+        # 先等松开，避免上一轮的按住被当成新的一轮
+        while self.held():
+            if _key_down(VK_Q):
+                return False
+            time.sleep(self.poll)
+
+        while True:
+            if _key_down(VK_Q):
+                return False
+            if self.held():
+                if self._on_press is not None:
+                    try:
+                        self._on_press()
+                    except Exception:
+                        pass
+                return True
+            time.sleep(self.poll)
+
+
 def make_trigger(name: str) -> Trigger:
     """按名字建触发器。未知名字一律回退到 space。"""
     n = (name or "space").strip().lower()
     if n in ("auto", "always", "continuous"):
         return AutoTrigger()
+    if n in ("hold", "push", "pushtotalk"):
+        return PushToTalkTrigger()
     return SpaceTrigger()

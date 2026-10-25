@@ -21,6 +21,7 @@ import io
 import os
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -200,16 +201,42 @@ class TtsService:
         self._sd = sd
         return True
 
-    def _play(self, data, sr: int) -> bool:
+    def apply_config(self, voice=None, rate=None, volume=None) -> None:
+        """热切换音色/语速/音量：只重建引擎，不重启进程。"""
+        if voice:
+            self.cfg.voice = str(voice)
+        if rate:
+            self.cfg.rate = str(rate)
+        if volume:
+            self.cfg.volume = str(volume)
+        self.engine = make_engine(self.cfg)
+
+    def _play(self, data, sr: int, stop_event=None) -> bool:
         if not self._ensure_audio_out():
             return False
         try:
             self._sd.play(data, sr)
-            self._sd.wait()
-            return True
         except Exception as e:
             self.last_error = f"播放失败：{e}"
             return False
+
+        dur = float(len(data)) / float(sr or 24000)
+        t0 = time.time()
+        while time.time() - t0 < dur + 0.3:
+            if stop_event is not None and stop_event.is_set():
+                try:
+                    self._sd.stop()
+                except Exception:
+                    pass
+                return False
+            try:
+                stream = self._sd.get_stream()
+                if stream is None or not stream.active:
+                    return True
+            except Exception:
+                pass
+            time.sleep(0.05)
+        return True
 
     # -- 缓存 --
     def _cache_path(self, text: str) -> Path:
@@ -233,8 +260,11 @@ class TtsService:
             pass
 
     # -- 对外 --
-    def speak(self, text: str) -> bool:
-        """合成并播放。成功返回 True；任何失败都静默返回 False。"""
+    def speak(self, text: str, stop_event=None) -> bool:
+        """合成并播放。成功 True；失败静默 False。
+
+        stop_event 被 set 时立刻停声（UI 在按住空格时触发）。
+        """
         text = (text or "").strip()
         if not text or not self.cfg.enabled:
             return False
@@ -250,11 +280,10 @@ class TtsService:
         path = self._cache_path(text)
         cached = self._load_cache(path) if path.exists() else None
         if cached is not None:
-            return self._play(cached[0], cached[1])
+            return self._play(cached[0], cached[1], stop_event)
 
         out = self.engine.synth(text)
         if out is None:
-            # edge 失败 → 退 sapi（若可用）
             if self.cfg.engine != "sapi":
                 alt = SapiEngine()
                 if alt.available() and alt.synth(text) == "played":
@@ -265,7 +294,7 @@ class TtsService:
 
         data, sr = out
         self._save_cache(path, data, sr)
-        return self._play(data, sr)
+        return self._play(data, sr, stop_event)
 
     def close(self) -> None:
         try:

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>小72</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- 左：70% -->
+  <section class="stage">
+    <div class="orb-wrap">
+      <div class="orb" id="orb">
+        <div class="ring"></div>
+        <canvas id="wave" width="260" height="70"></canvas>
+        <div class="spinner" id="spinner"></div>
+      </div>
+      <div class="hint" id="hint">按住空格说话</div>
+    </div>
+
+    <div class="turns" id="turns"></div>
+  </section>
+
+  <!-- 右：30% -->
+  <aside class="side">
+    <div class="cards">
+      <div class="card">
+        <div class="label">麦克风</div>
+        <div class="meter"><i id="meterFill"></i></div>
+      </div>
+
+      <div class="card">
+        <div class="label">灯</div>
+        <div class="led" id="led">
+          <span data-i="1"></span><span data-i="2"></span><span data-i="3"></span>
+          <span data-i="4"></span><span data-i="5"></span><span data-i="6"></span>
+          <span data-i="7"></span><span data-i="8"></span><span data-i="9"></span>
+          <span data-i="10"></span>
+        </div>
+        <div class="ledtext" id="ledText">0%</div>
+      </div>
+
+      <div class="card metrics">
+        <div class="row"><span>ASR</span><b id="mAsr">–</b></div>
+        <div class="row"><span>意图</span><b id="mIntent">–</b></div>
+        <div class="row"><span>播报</span><b id="mTts">–</b></div>
+        <div class="row"><span>总计</span><b id="mTotal">–</b></div>
+      </div>
+
+      <div class="card">
+        <div class="row"><span>音频</span><b id="mAudio">–</b></div>
+        <div class="row"><span>会话</span><b id="mTurns">0 轮</b></div>
+        <div class="row"><span>串口</span><b id="mPort">–</b></div>
+      </div>
+    </div>
+
+    <button class="gear" id="gear" title="设置">⚙︎</button>
+  </aside>
+
+  <!-- 设置抽屉 -->
+  <div class="drawer" id="drawer">
+    <div class="drawer-head">
+      <h3>设置</h3>
+      <button class="close" id="closeDrawer">✕</button>
+    </div>
+
+    <div class="field">
+      <label>语速 <b id="rateVal">+50%</b></label>
+      <input type="range" id="rate" min="-50" max="100" step="5" value="50">
+      <div class="ticks"><span>慢</span><span>正常</span><span>快</span></div>
+    </div>
+
+    <div class="field">
+      <label>音量 <b id="volVal">+0%</b></label>
+      <input type="range" id="vol" min="-30" max="30" step="5" value="0">
+    </div>
+
+    <div class="field">
+      <label>音色</label>
+      <select id="voice"></select>
+    </div>
+
+    <div class="field muted">
+      <div>模型 / 麦克风 / API Key</div>
+      <div class="small">v2 开放</div>
+    </div>
+
+    <button class="primary" id="save">保存</button>
+  </div>
+
+  <div class="scrim" id="scrim"></div>
+  <div class="toast" id="toast"></div>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>

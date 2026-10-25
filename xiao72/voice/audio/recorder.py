@@ -150,17 +150,23 @@ class Recorder:
                          timeout: float = 30.0,
                          gain: bool = True,
                          silence_end_ms: int = 1200,
-                         max_utterance_ms: int = 10000) -> np.ndarray:
+                         max_utterance_ms: int = 10000,
+                         stop_when=None,
+                         tail_ms: int = 250,
+                         no_speech_ms: int = 5000,
+                         on_level=None) -> np.ndarray:
         """一直听，等你说完一句就返回（VAD 自动判断）。
 
         与 record(seconds) 的区别：
           · 不固定时长，你说多久就录多久
           · 说完（静音 silence_end_ms 毫秒）自动结束
           · pre-roll 避免丢开头，VAD 避免切掉结尾
-          · max_utterance_ms：硬上限。VAD 没判出句尾时也不会一直录到 timeout，
-            否则会长音频送进 Whisper，解码时间随长度线性增长（实测 30s 音频 ~20s）
+          · max_utterance_ms：硬上限，避免长音频拖慢 ASR
+          · stop_when：可选回调，返回 False 表示「松开/放手」；松开后收 tail_ms 尾巴
+          · no_speech_ms：开始后这么久还没检测到人声就放弃
+          · on_level(rms)：每块音频回调一次，用于 UI 波形
 
-        返回 float32 / 16k / 单声道；超时无语音则返回空数组。
+        返回 float32 / 16k / 单声道；没听到语音则返回空数组。
         """
         from .vad import FRAME_SIZE, VadSegmenter
 
@@ -177,9 +183,12 @@ class Recorder:
             blocksize = int(round(FRAME_SIZE * self.sr / 16000))
 
         buf16 = np.zeros(0, dtype=np.float32)
-        deadline = time.time() + timeout
+        t_start = time.time()
+        deadline = t_start + timeout
         max_samples = int(TARGET_SR * max_utterance_ms / 1000) if max_utterance_ms else 0
         captured = 0
+        started = False
+        released_at = None
 
         with sd.InputStream(samplerate=self.sr, channels=1, dtype="float32",
                             blocksize=blocksize, device=self.device_index) as stream:
@@ -200,19 +209,42 @@ class Recorder:
                             utt, _ = normalize_gain(utt)
                         return utt.astype(np.float32)
 
-                captured += x.size
-                if max_samples and captured >= max_samples:
-                    # 说太久 / VAD 没判出句尾：强制收尾，别让 ASR 解几十秒音频
+                # 电平（给 UI 画波形）
+                if on_level is not None:
+                    try:
+                        on_level(float(np.sqrt(np.mean(x ** 2))) if x.size else 0.0)
+                    except Exception:
+                        pass
+
+                # 是否已经开口
+                if not started and getattr(segmenter, "speaking", False):
+                    started = True
+
+                # 还没开口且超时 → 放弃
+                if (not started) and no_speech_ms and (time.time() - t_start) * 1000 > no_speech_ms:
+                    return np.zeros(0, dtype=np.float32)
+
+                # 松手：记录时刻，留 tail 再收尾
+                if stop_when is not None and released_at is None:
+                    try:
+                        if not stop_when():
+                            released_at = time.time()
+                    except Exception:
+                        pass
+                if released_at is not None and (time.time() - released_at) * 1000 >= tail_ms:
                     break
 
-        # 超时：如果正在说话，强制输出已录到的部分
+                captured += x.size
+                if max_samples and captured >= max_samples:
+                    # 说太久 / VAD 没判出句尾：强制收尾
+                    break
+
+        # 超时/松手：如果已经在说话，强制输出已录到的部分
         tail = segmenter.flush()
         if tail is not None:
             if gain:
                 tail, _ = normalize_gain(tail)
             return tail.astype(np.float32)
-
-        return np.zeros(0, dtype=np.float32)
 
         return np.zeros(0, dtype=np.float32)
 
