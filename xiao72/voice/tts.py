@@ -55,6 +55,43 @@ class TtsConfig:
         return "%s / %s / rate %s" % (self.engine, self.voice, self.rate)
 
 
+import re
+
+_SENT_END = re.compile(r'(?<=[。！？!?；;\n])')
+
+
+def split_text(text: str, max_len: int = 40) -> list:
+    """按标点切句，过长再硬切。用于「边合成边播」。"""
+    text = (text or "").strip()
+    if not text:
+        return []
+
+    parts = [p.strip() for p in _SENT_END.split(text) if p.strip()]
+
+    out, buf = [], ""
+    for p in parts:
+        # 单句超长：按逗号再分，仍超长就硬切
+        while len(p) > max_len:
+            cut = p.rfind("，", 0, max_len)
+            if cut <= 0:
+                cut = max_len
+            head, p = p[:cut + 1], p[cut + 1:]
+            if head.strip():
+                out.append(head.strip())
+            p = p.strip()
+        if not p:
+            continue
+        if len(buf) + len(p) <= max_len:
+            buf += p
+        else:
+            if buf:
+                out.append(buf)
+            buf = p
+    if buf:
+        out.append(buf)
+    return out or [text]
+
+
 def cache_dir() -> Path:
     base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
     d = Path(base) / "xiao72" / "tts_cache"
@@ -261,6 +298,28 @@ class TtsService:
             sf.write(str(path), data, sr, format="WAV")
         except Exception:
             pass
+
+    # -- 分句流水线 --
+    def prepare_chunks(self, text: str, max_len: int = 40):
+        """把长句切成短句，逐句提交后台合成。
+
+        返回 [(句子, future), ...]。第一句合成完就能开播，
+        后面的在播放期间继续合成，避免「等整段合成完」的空白。
+        """
+        if not text or not self.cfg.enabled:
+            return []
+        return [(c, self._pool.submit(self._synth_or_cached, c))
+                for c in split_text(text, max_len)]
+
+    def play_chunks(self, items, stop_event=None) -> int:
+        """按顺序播放；每句就绪即播。返回成功播出的句数。"""
+        n = 0
+        for _, job in items:
+            if stop_event is not None and stop_event.is_set():
+                break
+            if self.play(job, stop_event):
+                n += 1
+        return n
 
     # -- 对外 --
     def prepare(self, text: str):

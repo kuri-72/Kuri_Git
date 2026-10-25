@@ -459,32 +459,44 @@ class VoiceAssistant:
         **文字在播报之前就发出去**：这样用户打断播报时，全文已经在屏幕上，
         不需要等声音放完才知道说了什么。
         """
-        # 先让 TTS 在后台开始合成，文字再发出去 —— 打字和合成并行，
-        # 用户读完之前声音通常已经就绪
-        job = None
+        # 先让 TTS 在后台逐句合成，文字再发出去 —— 打字和合成并行
+        items = []
         if self.tts is not None and r.say:
             try:
-                job = self.tts.prepare(r.say)
+                items = self.tts.prepare_chunks(r.say)
             except Exception:
-                job = None
+                items = []
 
+        t_emit = time.time()
         self._emit({"t": "reply", "text": r.say, "cmd": r.cmd})
         self._emit({"t": "metrics",
                     "asr": round(r.t_asr, 2), "intent": round(r.t_intent, 2),
                     "act": round(r.t_act, 2), "total": round(r.t_total, 2),
                     "audio_s": round(r.audio_s, 1)})
 
-        if job is not None:
+        if items:
             rt = getattr(self, "runtime", None)
-            stop_ev = None
-            if rt is not None:
-                stop_ev = rt.interrupt_flag
-                # 不清空：若用户已在打字期间按住空格，这里应当立刻生效。
-                # 每轮开始时 run_ui 会统一清一次。
+            stop_ev = rt.interrupt_flag if rt is not None else None
             self._state("speaking")
-            t2 = time.time()
-            self.tts.play(job, stop_event=stop_ev)
-            r.t_total += time.time() - t2
+
+            first_ms = -1
+            played = 0
+            for i, (_, job) in enumerate(items):
+                try:
+                    job.result(timeout=30)          # 等这一句合成好
+                except Exception:
+                    break
+                if first_ms < 0:
+                    first_ms = int((time.time() - t_emit) * 1000)
+                if stop_ev is not None and stop_ev.is_set():
+                    break
+                if not self.tts.play(job, stop_ev):
+                    break
+                played += 1
+
+            self._emit({"t": "tts", "first_ms": first_ms,
+                        "chunks": len(items), "played": played})
+            r.t_total += time.time() - t_emit
 
         self._state("idle")
         self._emit({"t": "stats", "turns": self.turns, "ok": self.ok,

@@ -200,10 +200,14 @@
           if (e.text) typewrite(lastReplyEl, e.text); else setInstant(lastReplyEl, '(未发送)');
           break;
         }
+        case 'tts':
+          $('mTts').textContent = e.first_ms >= 0
+            ? (e.first_ms / 1000).toFixed(1) + 's / ' + e.chunks + '句'
+            : '–';
+          break;
         case 'metrics':
           $('mIntent').textContent = e.intent + 's';
           $('mTotal').textContent = e.total + 's';
-          $('mTts').textContent = Math.max(0, e.total - e.intent - e.asr).toFixed(1) + 's';
           break;
         case 'led': setLed(e.brightness, e.period); break;
         case 'serial': $('mPort').textContent = e.port || '未连接'; break;
