@@ -26,13 +26,16 @@
   window.addEventListener('resize', fitCanvas);
 
   // 三层：主线红，左灰，右绿；各自独立，不叠加成一条
+  // 颜色全部来自 theme.css，这里只取 RGB 分量（canvas 需要 rgba）
+  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
   // 数组顺序 = 绘制顺序：先画的在底层，后画的在顶层
   //   → 绿（底）→ 灰（中）→ 红（顶）
   // delay 是各层相位错开量：0 / 2.1 / 4.2 ≈ 均分一个周期
   const PEAKS = [
-    { c: 0.75, k: 0.30, rgb: '48,209,88',  fill: 0.08, line: 0.85, delay: 0.0 },  // 绿（最底层）
-    { c: 0.25, k: 0.30, rgb: '142,142,147', fill: 0.10, line: 0.80, delay: 2.1 },  // 灰（中层）
-    { c: 0.50, k: 1.00, rgb: '255,69,58',  fill: 0.12, line: 0.95, delay: 4.2 },  // 红（最顶层）
+    { c: 0.75, k: 0.30, rgb: cssVar('--c-green-rgb'),  fill: 0.08, line: 0.85, delay: 0.0 },  // 绿（最底层）
+    { c: 0.25, k: 0.30, rgb: cssVar('--c-gray-rgb'),   fill: 0.10, line: 0.80, delay: 2.1 },  // 灰（中层）
+    { c: 0.50, k: 1.00, rgb: cssVar('--c-accent-rgb'), fill: 0.12, line: 0.95, delay: 4.2 },  // 红（最顶层）
   ];
   const SIGMA = 0.11;             // 峰的胖瘦（相对画布宽）
   const PAD_X = 0, PAD_Y = 14;    // 横向不留白：波形宽度 = 胶囊宽度
