@@ -147,6 +147,16 @@ def start_watcher(runtime) -> None:
         time.sleep(0.03)
 
 
+def port_in_use(port: int, host: str = HOST) -> bool:
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(0.3)
+    try:
+        return s.connect_ex((host, port)) == 0
+    finally:
+        s.close()
+
+
 # ---------------------------------------------------------------- 入口
 
 def main() -> int:
@@ -155,6 +165,16 @@ def main() -> int:
     ap.add_argument("--port", type=int, default=PORT)
     ap.add_argument("--dry-run", action="store_true", help="不发串口")
     args = ap.parse_args()
+
+    # 单实例：已有实例在跑就不再起第二套服务（否则端口冲突 + 抢麦克风）
+    if port_in_use(args.port):
+        url = "http://%s:%d/" % (HOST, args.port)
+        print("[UI] 已有实例在运行，直接连它：%s" % url, flush=True)
+        import webview
+        webview.create_window("小72（已在运行）", url, width=1200, height=760,
+                              min_size=(900, 600), background_color="#0B0B0D")
+        webview.start()
+        os._exit(0)
 
     from ui import settings as st
     from ui.events import Bus

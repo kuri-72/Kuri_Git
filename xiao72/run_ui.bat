@@ -23,6 +23,11 @@ if not defined PY (where py >nul 2>&1 && set "PY=py")
 if not defined PY goto :nopy
 
 "%PY%" run_ui.py %*
+if errorlevel 1 (
+  echo.
+  echo [ERROR] exit code %errorlevel%
+  pause
+)
 exit /b 0
 
 :nopy
