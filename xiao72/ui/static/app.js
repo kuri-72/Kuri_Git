@@ -24,26 +24,25 @@
   }
   window.addEventListener('resize', fitCanvas);
 
-  // ---------------- 波形：三个高斯峰，各自成层叠加 ----------------
-  //   中心     1.0 倍
-  //   1/4、3/4  各 0.3 倍
-  // 三层互不相加，各自画一条带子，重叠处自然加深
+  // 三层：主线红，左灰，右绿；各自独立，不叠加成一条
   const PEAKS = [
-    { c: 0.50, k: 1.0, fill: 0.13, line: 0.85 },   // 主峰
-    { c: 0.25, k: 0.3, fill: 0.10, line: 0.50 },   // 左副峰
-    { c: 0.75, k: 0.3, fill: 0.10, line: 0.50 },   // 右副峰
+    { c: 0.50, k: 1.00, rgb: '255,59,48',  fill: 0.12, line: 0.95, delay: 0.0 },  // 红（主）
+    { c: 0.25, k: 0.30, rgb: '142,142,147', fill: 0.08, line: 0.75, delay: 0.9 },  // 灰
+    { c: 0.75, k: 0.30, rgb: '52,199,89',  fill: 0.08, line: 0.85, delay: 1.8 },  // 绿
   ];
   const SIGMA = 0.11;             // 峰的胖瘦（相对画布宽）
-
-  const rgb = (a) => (state === 'recording' ? `rgba(36,138,61,${a})` : `rgba(199,199,204,${a})`);
+  const PAD_X = 14, PAD_Y = 12;   // 内缩留白：曲线不进虚线框的边
+  let phase = 0;                  // 涌动相位
 
   function draw() {
     const w = W, h = H;
     if (!w || !h) return;
-    const mid = h * 0.5, amp = h * 0.40;
+    const mid = h * 0.5;
+    const amp = Math.min(h * 0.40, h * 0.5 - PAD_Y);
+    const innerW = Math.max(1, w - PAD_X * 2);
     ctx.clearRect(0, 0, w, h);
 
-    const s = Math.pow(Math.max(0, Math.min(1, level)), 0.55);   // 感知压缩
+    const base = Math.pow(Math.max(0, Math.min(1, level)), 0.55);   // 感知压缩
 
     const N = 96;
     const path = (pts, reverse) => {
@@ -59,12 +58,16 @@
 
     // 逐个峰独立绘制：先填带子，再描上下两条边
     for (const p of PEAKS) {
+      // 极缓慢的涌动：每层相位不同，看起来像水波在慢慢推
+      const surge = 0.035 + 0.055 * (0.5 - 0.5 * Math.cos(phase * 0.036 + p.delay));
+      const s = Math.max(base, surge);
+
       const top = [], bot = [];
       for (let i = 0; i <= N; i++) {
         const xn = i / N;
         const d = xn - p.c;
         const y = p.k * Math.exp(-(d * d) / (2 * SIGMA * SIGMA)) * s * amp;
-        const x = xn * w;
+        const x = PAD_X + xn * innerW;
         top.push([x, mid - y]);
         bot.push([x, mid + y * 0.42]);       // 上下不对称：下沿短
       }
@@ -73,12 +76,12 @@
       path(top, false);
       path(bot, true);
       ctx.closePath();
-      ctx.fillStyle = rgb(p.fill);
+      ctx.fillStyle = `rgba(${p.rgb},${p.fill})`;
       ctx.fill();
 
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2;                      // 三层线宽统一
       ctx.lineCap = 'round';
-      ctx.strokeStyle = rgb(p.line);
+      ctx.strokeStyle = `rgba(${p.rgb},${p.line})`;
       ctx.beginPath(); path(top, false); ctx.stroke();
       ctx.beginPath(); path(bot, false); ctx.stroke();
     }
@@ -86,11 +89,12 @@
 
   function pushLevel(v) {
     level = Math.max(v, level * 0.86);        // 起得快，落得慢
-    if (!rafId) rafId = requestAnimationFrame(() => { rafId = null; draw(); });
   }
-  // 没有新电平时自然回落；静止时就是一条平线（不再有随机抖动）
+  // 常驻重绘：涌动需要连续帧；没有新电平时 level 自然回落
   setInterval(() => {
-    if (level > 0.002) { level *= 0.90; draw(); }
+    phase += 1;
+    if (level > 0.002) level *= 0.90;
+    draw();
   }, 80);
   fitCanvas();
 
