@@ -197,7 +197,7 @@ def main() -> int:
 
     window = webview.create_window(
         "小72", url, width=1200, height=760, min_size=(900, 600),
-        background_color="#F2F2F7",
+        background_color="#0B0B0D",
     )
     print("[UI] 窗口已创建，进入事件循环…", flush=True)
     webview.start()
