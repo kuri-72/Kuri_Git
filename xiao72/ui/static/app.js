@@ -33,14 +33,20 @@
     { c: 0.50, k: 1.00, rgb: '255,69,58',  fill: 0.12, line: 0.95, delay: 0.0 },  // 红（最顶层）
   ];
   const SIGMA = 0.11;             // 峰的胖瘦（相对画布宽）
-  const PAD_X = 14, PAD_Y = 12;   // 内缩留白：曲线不进虚线框的边
+  const PAD_X = 14, PAD_Y = 14;   // 内缩留白：曲线不进虚线框的边
   let phase = 0;                  // 涌动相位
+
+  // 涌动：一条长周期正弦，横向缓慢推进。
+  // 峰值 = SURGE_AMP × amp × 该层波峰系数 p.k
+  const SURGE_AMP = 0.16;         // 涌动幅度（相对 amp）
+  const SURGE_WAVE = 1.30;        // 波长（相对画布宽，>1 表示一个屏里不足一个完整波）
+  const SURGE_SPEED = 0.022;      // 每帧相位增量（80ms/帧 → 约 22 秒走完一圈）
 
   function draw() {
     const w = W, h = H;
     if (!w || !h) return;
     const mid = h * 0.5;
-    const amp = Math.min(h * 0.40, h * 0.5 - PAD_Y);
+    const amp = Math.min(h * 0.34, (h * 0.5 - PAD_Y) / (1 + SURGE_AMP));
     const innerW = Math.max(1, w - PAD_X * 2);
     ctx.clearRect(0, 0, w, h);
 
@@ -60,18 +66,24 @@
 
     // 逐个峰独立绘制：先填带子，再描上下两条边
     for (const p of PEAKS) {
-      // 极缓慢的涌动：每层相位不同，看起来像水波在慢慢推
-      const surge = 0.035 + 0.055 * (0.5 - 0.5 * Math.cos(phase * 0.036 + p.delay));
-      const s = Math.max(base, surge);
+      const s = base;
 
       const top = [], bot = [];
       for (let i = 0; i <= N; i++) {
         const xn = i / N;
         const d = xn - p.c;
-        const y = p.k * Math.exp(-(d * d) / (2 * SIGMA * SIGMA)) * s * amp;
+
+        // ① 自己的形状（高斯带，随音量升降）
+        const body = p.k * Math.exp(-(d * d) / (2 * SIGMA * SIGMA)) * s * amp;
+
+        // ② 叠一条长周期脉冲波，峰值按本层波峰系数缩放 → 整体上下涌动
+        const swell = Math.sin(xn / SURGE_WAVE * Math.PI * 2
+                               - phase * SURGE_SPEED + p.delay)
+                      * SURGE_AMP * amp * p.k;
+
         const x = PAD_X + xn * innerW;
-        top.push([x, mid - y]);
-        bot.push([x, mid + y * 0.42]);       // 上下不对称：下沿短
+        top.push([x, mid - body - swell]);
+        bot.push([x, mid + body * 0.42 - swell]);   // 下沿短，整体随 swell 平移
       }
 
       ctx.beginPath();
