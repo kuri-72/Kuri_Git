@@ -5,7 +5,7 @@
   const wave = $('wave'), ctx = wave.getContext('2d');
   const meterFill = $('meterFill'), led = $('led'), ledText = $('ledText');
 
-  let levels = new Array(64).fill(0);
+  let level = 0;                  // 0..1 平滑音量：只决定「多高」，不决定「往哪走」
   let rafId = null;
   let typing = null;              // {finish()}
   let state = 'idle';
@@ -24,27 +24,41 @@
   }
   window.addEventListener('resize', fitCanvas);
 
-  // ---------------- 波形（平滑曲线，不是柱条） ----------------
+  // ---------------- 波形：三个高斯峰的叠加 ----------------
+  //   中心   1.0 倍
+  //   1/4、3/4 各 0.3 倍，和主峰重叠
+  // 形状固定不动，只随音量整体上下起伏（像正态分布被"撑起来"）
+  const PEAKS = [[0.5, 1.0], [0.25, 0.3], [0.75, 0.3]];
+  const SIGMA = 0.11;             // 峰的胖瘦（相对画布宽）
+
+  function bell(xn) {             // xn: 0..1 归一化横坐标
+    let sum = 0;
+    for (const [c, k] of PEAKS) {
+      const d = xn - c;
+      sum += k * Math.exp(-(d * d) / (2 * SIGMA * SIGMA));
+    }
+    return sum;
+  }
+
   function draw() {
-    const w = W, h = H, n = levels.length;
+    const w = W, h = H;
     if (!w || !h) return;
-    const mid = h * 0.5, amp = h * 0.46;
+    const mid = h * 0.5, amp = h * 0.40;
     ctx.clearRect(0, 0, w, h);
-    if (n < 2) return;
 
-    const step = w / (n - 1);
+    const s = Math.pow(Math.max(0, Math.min(1, level)), 0.55);   // 感知压缩
+    const active = state === 'recording';
+    const col = active ? '#248A3D' : '#C7C7CC';
 
-    // 三点加权平滑：去掉逐点抖动，曲线更顺
-    const sm = levels.map((v, i) => {
-      const a = (i > 0) ? levels[i - 1] : v;
-      const b = (i < n - 1) ? levels[i + 1] : v;
-      return a * 0.22 + v * 0.56 + b * 0.22;
-    });
-    // 感知压缩：小声也看得见，大声不至于顶满
-    const shaped = sm.map((v) => Math.pow(Math.max(0, v), 0.55));
-
-    const top = shaped.map((s, i) => [i * step, mid - s * amp]);
-    const bot = shaped.map((s, i) => [i * step, mid + s * amp * 0.42]);   // 上下不对称
+    const N = 96;
+    const top = [], bot = [];
+    for (let i = 0; i <= N; i++) {
+      const xn = i / N;
+      const y = bell(xn) * s * amp;
+      const x = xn * w;
+      top.push([x, mid - y]);
+      bot.push([x, mid + y * 0.42]);      // 上下不对称：下沿短
+    }
 
     const path = (pts, reverse) => {
       const p = reverse ? pts.slice().reverse() : pts;
@@ -57,10 +71,7 @@
       ctx.lineTo(p[p.length - 1][0], p[p.length - 1][1]);
     };
 
-    const active = state === 'recording';
-    const col = active ? '#248A3D' : '#C7C7CC';
-
-    // 填充：上沿去，下沿回，形成一条对称的带子
+    // 上下两条曲线围成的带子
     ctx.beginPath();
     path(top, false);
     path(bot, true);
@@ -72,32 +83,21 @@
     ctx.fillStyle = g;
     ctx.fill();
 
-    // 中轴两条细线
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.strokeStyle = col;
     ctx.beginPath(); path(top, false); ctx.stroke();
     ctx.beginPath(); path(bot, false); ctx.stroke();
   }
-  function roundRect(c, x, y, w, h, r) {
-    c.moveTo(x + r, y);
-    c.arcTo(x + w, y, x + w, y + h, r);
-    c.arcTo(x + w, y + h, x, y + h, r);
-    c.arcTo(x, y + h, x, y, r);
-    c.arcTo(x, y, x + w, y, r);
-    c.closePath();
-  }
+
   function pushLevel(v) {
-    levels.push(v); levels.shift();
+    level = Math.max(v, level * 0.86);        // 起得快，落得慢
     if (!rafId) rafId = requestAnimationFrame(() => { rafId = null; draw(); });
   }
-  // 静音时也让波形轻微呼吸，避免看起来像死了
+  // 没有新电平时自然回落；静止时就是一条平线（不再有随机抖动）
   setInterval(() => {
-    if (state === 'recording' || state === 'waiting') {
-      levels = levels.map((v) => v * 0.92);
-      pushLevel(0.02 + Math.random() * 0.02);
-    }
-  }, 90);
+    if (level > 0.002) { level *= 0.90; draw(); }
+  }, 80);
   fitCanvas();
 
   // ---------------- 状态 ----------------
@@ -111,7 +111,7 @@
     hint.textContent = HINTS[v] || '';
     hint.classList.toggle('active', v === 'recording');
     if (v === 'idle' && typing) typing.finish();
-    if (v === 'thinking') { levels = levels.map(() => 0); draw(); }
+    if (v === 'thinking') { level = 0; draw(); }
   }
 
   // ---------------- 文本 ----------------
