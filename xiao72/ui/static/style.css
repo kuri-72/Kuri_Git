@@ -20,24 +20,27 @@ body{
 .orb canvas{transition:opacity .3s ease,transform .35s var(--spring)}
 .orb .spinner{
   position:absolute;width:58px;height:58px;border-radius:50%;
-  /* 整圈 360°：用 conic-gradient 做「亮度扫过」，再用 mask 抠成环 */
+  opacity:0;transform:scale(.4);
+  transition:opacity .25s ease,transform .35s var(--spring);
+}
+/* 旋转放在伪元素上：父级只管淡入/缩放，两者不会互相干扰 */
+.orb .spinner::after{
+  content:"";position:absolute;inset:0;border-radius:50%;
   background:conic-gradient(from 0deg,
-      rgba(36,138,61,.10) 0deg,
-      rgba(36,138,61,.55) 230deg,
-      #248A3D 345deg,
+      rgba(36,138,61,.06) 0deg,
+      rgba(36,138,61,.45) 200deg,
+      #248A3D 330deg,
       #248A3D 360deg);
   -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
           mask:radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
-  opacity:0;transform:scale(.4);
-  transition:opacity .25s ease,transform .35s var(--spring);
-  animation:spin 1.1s linear infinite;
+  animation:spin 1.15s linear infinite;
 }
 .orb .ring{
   position:absolute;inset:0;border-radius:999px;
   border:2px dashed #C7C7CC;opacity:.9;
   transition:all .35s var(--spring);
 }
-@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 
 /* 状态：等待按住 */
 .orb.waiting .ring{transform:scale(.92);opacity:.55;animation:breathe 2.4s ease-in-out infinite}

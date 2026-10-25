@@ -13,13 +13,23 @@
   // ---------------- 波形（平滑曲线，不是柱条） ----------------
   function draw() {
     const w = wave.width, h = wave.height, n = levels.length;
-    const mid = h / 2, amp = h * 0.42;
+    const mid = h * 0.5, amp = h * 0.46;
     ctx.clearRect(0, 0, w, h);
     if (n < 2) return;
 
     const step = w / (n - 1);
-    const top = levels.map((v, i) => [i * step, mid - Math.max(0.015, v) * amp]);
-    const bot = levels.map((v, i) => [i * step, mid + Math.max(0.015, v) * amp]);
+
+    // 三点加权平滑：去掉逐点抖动，曲线更顺
+    const sm = levels.map((v, i) => {
+      const a = (i > 0) ? levels[i - 1] : v;
+      const b = (i < n - 1) ? levels[i + 1] : v;
+      return a * 0.22 + v * 0.56 + b * 0.22;
+    });
+    // 感知压缩：小声也看得见，大声不至于顶满
+    const shaped = sm.map((v) => Math.pow(Math.max(0, v), 0.55));
+
+    const top = shaped.map((s, i) => [i * step, mid - s * amp]);
+    const bot = shaped.map((s, i) => [i * step, mid + s * amp * 0.42]);   // 上下不对称
 
     const path = (pts, reverse) => {
       const p = reverse ? pts.slice().reverse() : pts;
