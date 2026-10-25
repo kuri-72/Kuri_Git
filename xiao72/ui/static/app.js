@@ -27,10 +27,11 @@
   // 三层：主线红，左灰，右绿；各自独立，不叠加成一条
   // 数组顺序 = 绘制顺序：先画的在底层，后画的在顶层
   //   → 绿（底）→ 灰（中）→ 红（顶）
+  // delay 是各层相位错开量：0 / 2.1 / 4.2 ≈ 均分一个周期
   const PEAKS = [
-    { c: 0.75, k: 0.30, rgb: '48,209,88',  fill: 0.08, line: 0.85, delay: 1.8 },  // 绿（最底层）
-    { c: 0.25, k: 0.30, rgb: '142,142,147', fill: 0.10, line: 0.80, delay: 0.9 },  // 灰（中层）
-    { c: 0.50, k: 1.00, rgb: '255,69,58',  fill: 0.12, line: 0.95, delay: 0.0 },  // 红（最顶层）
+    { c: 0.75, k: 0.30, rgb: '48,209,88',  fill: 0.08, line: 0.85, delay: 0.0 },  // 绿（最底层）
+    { c: 0.25, k: 0.30, rgb: '142,142,147', fill: 0.10, line: 0.80, delay: 2.1 },  // 灰（中层）
+    { c: 0.50, k: 1.00, rgb: '255,69,58',  fill: 0.12, line: 0.95, delay: 4.2 },  // 红（最顶层）
   ];
   const SIGMA = 0.11;             // 峰的胖瘦（相对画布宽）
   const PAD_X = 14, PAD_Y = 14;   // 内缩留白：曲线不进虚线框的边
@@ -76,10 +77,11 @@
         // ① 自己的形状（高斯带，随音量升降）
         const body = p.k * Math.exp(-(d * d) / (2 * SIGMA * SIGMA)) * s * amp;
 
-        // ② 叠一条长周期脉冲波，峰值按本层波峰系数缩放 → 整体上下涌动
-        const swell = Math.sin(xn / SURGE_WAVE * Math.PI * 2
-                               - phase * SURGE_SPEED + p.delay)
-                      * SURGE_AMP * amp * p.k;
+        // ② 叠一条非匀速的涌波：相位和波长都在缓慢漂移，所以周期不固定
+        const t = phase * SURGE_SPEED;
+        const ph = t + p.delay + 0.55 * Math.sin(t * 0.11 + p.delay * 0.6);
+        const lam = SURGE_WAVE * (1 + 0.22 * Math.sin(t * 0.07 + p.delay));
+        const swell = Math.sin(xn / lam * Math.PI * 2 - ph) * SURGE_AMP * amp * p.k;
 
         const x = PAD_X + xn * innerW;
         top.push([x, mid - body - swell]);
