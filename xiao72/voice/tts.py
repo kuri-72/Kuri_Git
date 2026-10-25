@@ -188,6 +188,9 @@ class TtsService:
         self.engine = make_engine(self.cfg)
         self._sd = None
         self.last_error = ""
+        # 单线程池：合成在后台跑，主线程可以先把文字发出去
+        from concurrent.futures import ThreadPoolExecutor
+        self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tts")
 
     # -- 播放 --
     def _ensure_audio_out(self) -> bool:
@@ -260,45 +263,75 @@ class TtsService:
             pass
 
     # -- 对外 --
-    def speak(self, text: str, stop_event=None) -> bool:
-        """合成并播放。成功 True；失败静默 False。
+    def prepare(self, text: str):
+        """后台开始合成，立刻返回 future。UI 可以先把文字打出来，声音随后到。
 
-        stop_event 被 set 时立刻停声（UI 在按住空格时触发）。
+        返回 None 表示这句不需要发声（静音 / 空文本）。
         """
         text = (text or "").strip()
         if not text or not self.cfg.enabled:
-            return False
+            return None
+        return self._pool.submit(self._synth_or_cached, text)
+
+    def _synth_or_cached(self, text: str):
         if not self.engine.available():
             if self.cfg.engine != "sapi":
                 self.last_error = f"引擎 {self.cfg.engine} 不可用（缺依赖）"
-            return False
+            return None
 
         # sapi 自己会播，不缓存
         if self.engine.name == "sapi":
-            return self.engine.synth(text) == "played"
+            return ("sapi", text)
 
         path = self._cache_path(text)
-        cached = self._load_cache(path) if path.exists() else None
-        if cached is not None:
-            return self._play(cached[0], cached[1], stop_event)
+        if path.exists():
+            cached = self._load_cache(path)
+            if cached is not None:
+                return ("audio", cached[0], cached[1])
 
         out = self.engine.synth(text)
         if out is None:
             if self.cfg.engine != "sapi":
-                alt = SapiEngine()
-                if alt.available() and alt.synth(text) == "played":
-                    self.last_error = "edge 失败，已降级到 sapi"
-                    return True
-            self.last_error = "合成失败（网络或引擎问题）"
-            return False
-
+                self.last_error = "edge 合成失败"
+            return None
         data, sr = out
         self._save_cache(path, data, sr)
-        return self._play(data, sr, stop_event)
+        return ("audio", data, sr)
+
+    def play(self, job, stop_event=None) -> bool:
+        """等 prepare 的结果并播放。stop_event 被 set 时立刻停声。"""
+        if job is None:
+            return False
+        try:
+            out = job.result(timeout=30)
+        except Exception:
+            return False
+        if out is None:
+            # edge 失败 → 退 sapi（若可用）
+            if self.cfg.engine != "sapi":
+                alt = SapiEngine()
+                if alt.available():
+                    self.last_error = "edge 失败，已降级到 sapi"
+                    return alt.synth(str(getattr(job, "_text", ""))) == "played"
+            return False
+
+        if isinstance(out, tuple) and out and out[0] == "sapi":
+            return self.engine.synth(out[1]) == "played"
+        if isinstance(out, tuple) and out and out[0] == "audio":
+            return self._play(out[1], out[2], stop_event)
+        return False
+
+    def speak(self, text: str, stop_event=None) -> bool:
+        """合成 + 播放（同步版，给没有 UI 的场景用）。"""
+        return self.play(self.prepare(text), stop_event)
 
     def close(self) -> None:
         try:
             if self._sd is not None:
                 self._sd.stop()
+        except Exception:
+            pass
+        try:
+            self._pool.shutdown(wait=False)
         except Exception:
             pass

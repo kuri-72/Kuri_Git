@@ -108,7 +108,7 @@ class VoiceAssistant:
                  use_llm: bool = True,
                  verbose: bool = False,
                  device: str | None = None,
-                 max_utterance_ms: int = 10000,
+                 max_utterance_ms: int = 20000,
                  trigger: Trigger | None = None):
         self.model_name = model
         self.asr_device = asr_device
@@ -459,13 +459,22 @@ class VoiceAssistant:
         **文字在播报之前就发出去**：这样用户打断播报时，全文已经在屏幕上，
         不需要等声音放完才知道说了什么。
         """
+        # 先让 TTS 在后台开始合成，文字再发出去 —— 打字和合成并行，
+        # 用户读完之前声音通常已经就绪
+        job = None
+        if self.tts is not None and r.say:
+            try:
+                job = self.tts.prepare(r.say)
+            except Exception:
+                job = None
+
         self._emit({"t": "reply", "text": r.say, "cmd": r.cmd})
         self._emit({"t": "metrics",
                     "asr": round(r.t_asr, 2), "intent": round(r.t_intent, 2),
                     "act": round(r.t_act, 2), "total": round(r.t_total, 2),
                     "audio_s": round(r.audio_s, 1)})
 
-        if self.tts is not None and r.say:
+        if job is not None:
             rt = getattr(self, "runtime", None)
             stop_ev = None
             if rt is not None:
@@ -473,7 +482,7 @@ class VoiceAssistant:
                 stop_ev.clear()
             self._state("speaking")
             t2 = time.time()
-            self.tts.speak(r.say, stop_event=stop_ev)
+            self.tts.play(job, stop_event=stop_ev)
             r.t_total += time.time() - t2
 
         self._state("idle")

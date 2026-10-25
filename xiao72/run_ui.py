@@ -89,7 +89,8 @@ def start_pipeline(runtime, dry_run: bool) -> None:
     from voice.trigger import PushToTalkTrigger
 
     a = VoiceAssistant(port=None if dry_run else "auto",
-                       trigger=PushToTalkTrigger(), use_llm=True)
+                       trigger=PushToTalkTrigger(), use_llm=True,
+                       max_utterance_ms=int(os.environ.get("X72_MAX_UTTERANCE_MS", "20000")))
     a.runtime = runtime
     runtime.pipeline = a
 
