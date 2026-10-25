@@ -479,7 +479,8 @@ class VoiceAssistant:
             stop_ev = None
             if rt is not None:
                 stop_ev = rt.interrupt_flag
-                stop_ev.clear()
+                # 不清空：若用户已在打字期间按住空格，这里应当立刻生效。
+                # 每轮开始时 run_ui 会统一清一次。
             self._state("speaking")
             t2 = time.time()
             self.tts.play(job, stop_event=stop_ev)
