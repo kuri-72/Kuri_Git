@@ -5,27 +5,54 @@
   const wave = $('wave'), ctx = wave.getContext('2d');
   const meterFill = $('meterFill'), led = $('led'), ledText = $('ledText');
 
-  let levels = new Array(48).fill(0);
+  let levels = new Array(64).fill(0);
   let rafId = null;
   let typing = null;              // {finish()}
   let state = 'idle';
 
-  // ---------------- 波形 ----------------
+  // ---------------- 波形（平滑曲线，不是柱条） ----------------
   function draw() {
     const w = wave.width, h = wave.height, n = levels.length;
-    const bw = w / n;
+    const mid = h / 2, amp = h * 0.42;
     ctx.clearRect(0, 0, w, h);
-    for (let i = 0; i < n; i++) {
-      const v = Math.max(0.04, levels[i]);
-      const bh = Math.min(h - 8, v * h * 1.5);
-      const x = i * bw + bw * 0.2;
-      const y = (h - bh) / 2;
-      ctx.fillStyle = state === 'recording' ? '#248A3D' : '#C7C7CC';
-      ctx.beginPath();
-      const r = Math.min(bw * 0.3, 2);
-      roundRect(ctx, x, y, bw * 0.6, bh, r);
-      ctx.fill();
-    }
+    if (n < 2) return;
+
+    const step = w / (n - 1);
+    const top = levels.map((v, i) => [i * step, mid - Math.max(0.015, v) * amp]);
+    const bot = levels.map((v, i) => [i * step, mid + Math.max(0.015, v) * amp]);
+
+    const path = (pts, reverse) => {
+      const p = reverse ? pts.slice().reverse() : pts;
+      ctx.moveTo(p[0][0], p[0][1]);
+      for (let i = 1; i < p.length - 1; i++) {
+        const xc = (p[i][0] + p[i + 1][0]) / 2;
+        const yc = (p[i][1] + p[i + 1][1]) / 2;
+        ctx.quadraticCurveTo(p[i][0], p[i][1], xc, yc);
+      }
+      ctx.lineTo(p[p.length - 1][0], p[p.length - 1][1]);
+    };
+
+    const active = state === 'recording';
+    const col = active ? '#248A3D' : '#C7C7CC';
+
+    // 填充：上沿去，下沿回，形成一条对称的带子
+    ctx.beginPath();
+    path(top, false);
+    path(bot, true);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, mid - amp, 0, mid + amp);
+    g.addColorStop(0, active ? 'rgba(36,138,61,.20)' : 'rgba(199,199,204,.22)');
+    g.addColorStop(0.5, active ? 'rgba(36,138,61,.10)' : 'rgba(199,199,204,.10)');
+    g.addColorStop(1, active ? 'rgba(36,138,61,.20)' : 'rgba(199,199,204,.22)');
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // 中轴两条细线
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = col;
+    ctx.beginPath(); path(top, false); ctx.stroke();
+    ctx.beginPath(); path(bot, false); ctx.stroke();
   }
   function roundRect(c, x, y, w, h, r) {
     c.moveTo(x + r, y);
