@@ -57,26 +57,49 @@ Get-FileHash "$md\silero_vad.onnx" -Algorithm SHA256
 
 | 项目 | 值 |
 |---|---|
-| 设备主机名 | `<DESKTOP-4JAFHLD>` |
-| 角色 | `<同步设备 1>` |
-| Python 版本 | `<3.x.y>` |
-| Python 可执行文件路径 | `<...>` |
-| venv 路径 | `<...>` |
-| 操作系统版本 | `<Windows 11 24H2 ...>` |
-| 仓库路径 | `<...>` |
-| X72_PROVIDER | `<deepseek / qwen / ...>` |
-| X72_MODEL | `<...>` |
-| X72_MODEL_DIR | `<...>` |
-| ASR 模型尺寸 | `<small / medium / ...>` |
-| 是否用 GPU | `<否，CPU int8 / 是，CUDA>` |
-| X72_TTS_ENGINE | `<edge / sapi>` |
-| X72_TTS_VOICE | `<...>` |
-| 串口 | `<COMx / 自动探测>` |
-| 模型目录实际路径 | `<...>` |
-| 模型文件总数 / 总大小 | `<N 个 / xxx MB>` |
-| silero_vad.onnx SHA256 | `<...>` |
-| 模型文件清单 | `<贴 Get-ChildItem 的相对路径+大小，可折叠>` |
-| 本机特有的坑 | `<启动慢 / 需要代理 / 音频设备名怪 ...>` |
+| 设备主机名 | DESKTOP-4JAFHLD |
+| 角色 | 同步设备 1（笔记本） |
+| Python 版本 | **3.14.0** ⚠️ 与主设备 3.13.15 不一致 |
+| Python 可执行文件路径 | `C:\Users\NERV_Note_02\xiao72-venv\Scripts\python.exe` |
+| venv 路径 | `C:\Users\NERV_Note_02\xiao72-venv`　⚠️ **在仓库外**，仓库下没有 `xiao72\.venv` |
+| 操作系统版本 | Windows 11 家庭版 10.0.26200 |
+| 仓库路径 | `C:\Users\NERV_Note_02\Desktop\git` |
+| X72_PROVIDER | deepseek |
+| X72_MODEL | deepseek-chat（.env 未显式设置，走默认） |
+| X72_MODEL_DIR | `C:\Users\NERV_Note_02\AppData\Local\xiao72\models` |
+| ASR 模型尺寸 | small（faster-whisper, int8, CPU） |
+| 是否用 GPU | 否，CPU int8（本机是 Intel Arc 140T，无 NVIDIA） |
+| X72_TTS_ENGINE | edge |
+| X72_TTS_VOICE | zh-CN-XiaoxiaoNeural（语速 +25%，在 settings.json 里） |
+| 串口 | 灯控板 **COM13**（靠 `[I?]` 握手自动发现，不写死）；K230 注视板占 **COM12** |
+| 模型目录实际路径 | `C:\Users\NERV_Note_02\AppData\Local\xiao72\models` |
+| 模型文件总数 / 总大小 | **8 个 / 465.9 MB** |
+| silero_vad.onnx SHA256 | `1A153A22F4509E292A94E67D6F9B85E8DEB25B4988682B7E174C65279D8788E3` |
+
+### 模型文件清单
+
+| 相对路径 | 字节 |
+|---|---:|
+| `silero_vad.onnx` | 2,327,524 |
+| `CACHEDIR.TAG` | 195 |
+| `models--Systran--faster-whisper-small/refs/main` | 40 |
+| `models--Systran--faster-whisper-small/snapshots/536b0662.../config.json` | 2,370 |
+| `models--Systran--faster-whisper-small/snapshots/536b0662.../model.bin` | 483,546,902 |
+| `models--Systran--faster-whisper-small/snapshots/536b0662.../tokenizer.json` | 2,203,239 |
+| `models--Systran--faster-whisper-small/snapshots/536b0662.../vocabulary.txt` | 459,861 |
+| `models--Systran--faster-whisper-small/trees/536b0662...json` | 867 |
+
+> `536b0662...` = `536b0662742c02347bc0e980a01041f333bce120`
+
+### 本机特有的坑
+
+1. **Python 3.14 而不是 3.13**：`ctranslate2==4.8.3`、`onnxruntime==1.31.0`（主设备是 4.8.4 / 1.31.1）。
+   版本锁见 `xiao72/requirements.lock.txt`。主设备若要完全复刻，建议直接用这份锁。
+2. **venv 在仓库外**（`C:\Users\NERV_Note_02\...`），不是仓库内的 `xiao72\.venv`。
+   `run_voice.bat` / `run_ui.bat` 通过 `.env` 里的 `X72_PYTHON` 找解释器，不依赖固定路径。
+3. **两个串口同时占**：COM13（灯）/ COM12（K230）。换设备顺序会变，靠握手识别。
+4. **模型首次加载 ~3.5 秒**（small / CPU int8），不是"20 秒"那个提示。
+
 
 ## 五、完成后
 
