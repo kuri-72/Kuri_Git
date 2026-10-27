@@ -106,3 +106,31 @@ Get-FileHash "$md\silero_vad.onnx" -Algorithm SHA256
 - 提交信息用 `docs: 环境交接回执`
 - `push` 成功后，告诉用户「交接材料已推」
 - 主设备收到后会删除本文件
+
+---
+
+## 附：两台机器的分工建议（同步设备 1 补充，供参考）
+
+**不要试图把两台复刻成一样**——硬件差异太大，复刻只会两个都别扭。
+
+| | 笔记本（DESKTOP-4JAFHLD） | 台式机 / 4090 |
+|---|---|---|
+| 强项 | 麦、串口、显示器都在这台；人也在 | GPU |
+| 弱项 | **无 NVIDIA**（Intel Arc 140T） | 不在手边 |
+| 适合干 | 录音 / ASR / UI / 串口 / K230 目视 | 本地 8B~14B、SoVITS、批量转换 |
+| 不适合 | 任何吃 CUDA 的活 | 需要麦克风和串口的活 |
+
+**真正需要对齐的**，只有「能跑通的基础依赖」这一层：
+
+```
+faster-whisper + ctranslate2 + onnxruntime  → ASR
+sounddevice + soundfile + numpy             → 采集与播放
+pywebview + pythonnet + flask               → 界面
+pyserial                                    → 串口
+```
+
+`requirements.lock.txt` 就是这套东西的版本快照。**其余差异（Python 3.14 vs 3.13）不必强行拉平**——
+各自用自己跑得动的版本，接口是 HTTP / 串口，不是共享进程。
+
+如果哪天要做「笔记本听、台式机想」，中间是局域网 HTTP，不是代码复用。
+
