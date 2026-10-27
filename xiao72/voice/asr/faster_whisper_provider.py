@@ -70,6 +70,8 @@ class FasterWhisperProvider(AsrProvider):
                  num_workers: int = 1,
                  initial_prompt: str | None = DEFAULT_PROMPT):
         self.model_size = model_size
+        # 允许直接指向本地模型目录（离线环境用）：X72_ASR_MODEL=...\faster-whisper-small
+        self.model_id = os.environ.get("X72_ASR_MODEL") or model_size
         self.device = device
         self.compute_type = compute_type
         self.model_dir = model_dir or DEFAULT_MODEL_DIR
@@ -88,7 +90,7 @@ class FasterWhisperProvider(AsrProvider):
 
         Path(self.model_dir).mkdir(parents=True, exist_ok=True)
         self._model = WhisperModel(
-            self.model_size,
+            self.model_id,
             device=self.device,
             compute_type=self.compute_type,
             download_root=self.model_dir,

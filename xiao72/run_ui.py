@@ -22,6 +22,11 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+# 先读 .env，否则 X72_ASR_MODEL / X72_API_KEY 等配置在 UI 路径下不生效
+from host.config import load_dotenv  # noqa: E402
+
+load_dotenv()
+
 PORT = 8720
 HOST = "127.0.0.1"
 
