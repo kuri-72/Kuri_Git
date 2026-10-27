@@ -7,9 +7,17 @@ faster-whisper>=1.2,<2      # ASR（本地 Whisper）
 onnxruntime>=1.20           # Silero VAD（直接喂 .onnx，不装 silero-vad 包）
 sounddevice>=0.5,<0.6       # 麦克风录音
 numpy>=2.0                  # 音频帧运算
+soundfile>=0.12             # 解码 edge-tts 返回的 mp3
+
+# ---- 语音播报 ----
+edge-tts>=7.0               # 微软在线 TTS；离线可改用 X72_TTS_ENGINE=sapi
 
 # ---- 控制链路 ----
 pyserial>=3.5,<4            # 串口
+
+# ---- 界面 ----
+flask>=3.0                  # 本地 HTTP + SSE
+pywebview>=5.0              # 桌面窗口（Windows 依赖系统 WebView2 运行时）
 
 # ---- 意图识别（可选）----
 # 不装也能用：run_voice.py --no-llm 走规则版
